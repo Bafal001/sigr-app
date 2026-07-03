@@ -31,10 +31,10 @@ class Settings(BaseSettings):
     # Base de données
     database_url: str = "sqlite:///./data/sigr.db"
 
-    # LLM
+    # LLM — DeepSeek (compatible OpenAI SDK)
     llm_api_key: str = ""
-    llm_api_base_url: str = "https://api.openai.com/v1"
-    llm_model: str = "gpt-4o"
+    llm_api_base_url: str = "https://api.deepseek.com"
+    llm_model: str = "deepseek-v4-pro"
     llm_max_tokens: int = 4096
 
     # Sécurité
