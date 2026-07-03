@@ -189,10 +189,14 @@ def _extract_structured(file_path: Path, file_type: str) -> list[ReportInReview]
                 ],
             )
         )
-        # Paroisse : chercher une colonne qui contient "paroisse" et "nom" ou "1."
+        # Paroisse : chercher dans les sous-champs (pattern ">> 1. >> Paroisse")
         paroisse_nom = _find_smart(
-            row_dict, ["paroisse >> 1.", "paroisses >> 1. >> paroisse"]
-        ) or _find_smart(row_dict, ["paroisse", "église", "eglise"])
+            row_dict, ["listes des paroisses >> 1. >> paroisse", "paroisses >> 1. >> paroisse"],
+            allow_subfields=True,
+        ) or _find_smart(
+            row_dict, ["paroisse >> 1. >> nom", "liste des paroisses >> 1."],
+            allow_subfields=True,
+        )
 
         reports.append(
             ReportInReview(
@@ -209,18 +213,17 @@ def _extract_structured(file_path: Path, file_type: str) -> list[ReportInReview]
     return reports
 
 
-def _find_smart(row_dict: dict, keywords: list[str]) -> Optional[str]:
+def _find_smart(row_dict: dict, keywords: list[str], allow_subfields: bool = False) -> Optional[str]:
     """
-    Recherche dans les colonnes de MÉTADONNÉES uniquement (sans '>>').
-    Les colonnes avec '>>' sont des sous-champs, pas des métadonnées.
-    Si le fichier n'a que des sous-champs, retourne None (— affiché).
+    Recherche par mots-clés dans les colonnes.
+    Par défaut ignore les colonnes avec '>>' (sous-champs).
+    allow_subfields=True pour chercher aussi dans les sous-champs (ex: paroisse).
     """
     if not row_dict:
         return None
 
     for key, value in row_dict.items():
-        # Ignorer les colonnes qui sont des sous-champs (contiennent '>>')
-        if ">>" in str(key):
+        if not allow_subfields and ">>" in str(key):
             continue
         key_lower = key.lower().strip()
         for kw in keywords:
