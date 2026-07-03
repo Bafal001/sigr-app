@@ -160,13 +160,39 @@ def _extract_structured(file_path: Path, file_type: str) -> list[ReportInReview]
             str(k): (v if pd.notna(v) else None) for k, v in row.to_dict().items()
         }
 
-        # Extraire les champs d'aperçu depuis les données brutes
-        coordination_nom = _find_value_in_row(row_dict, "Coordination/Supervision")
-        annee = _parse_int_safe(_find_value_in_row(row_dict, "Année"))
-        trimestre = _parse_int_safe(_find_value_in_row(row_dict, "Trimestre"))
-        paroisse_nom = _find_value_in_row(
-            row_dict, "A. LISTE DES PAROISSES >> 1. >> Paroisse"
+        # Extraire les champs d'aperçu avec recherche intelligente multi-mot-clé
+        coordination_nom = _find_smart(
+            row_dict,
+            [
+                "coordination",
+                "supervision",
+                "coordo",
+            ],
         )
+        annee = _parse_int_safe(
+            _find_smart(
+                row_dict,
+                [
+                    "année",
+                    "annee",
+                    "exercice",
+                    "year",
+                ],
+            )
+        )
+        trimestre = _parse_int_safe(
+            _find_smart(
+                row_dict,
+                [
+                    "trimestre",
+                    "trim",
+                ],
+            )
+        )
+        # Paroisse : chercher une colonne qui contient "paroisse" et "nom" ou "1."
+        paroisse_nom = _find_smart(
+            row_dict, ["paroisse >> 1.", "paroisses >> 1. >> paroisse"]
+        ) or _find_smart(row_dict, ["paroisse", "église", "eglise"])
 
         reports.append(
             ReportInReview(
@@ -181,6 +207,27 @@ def _extract_structured(file_path: Path, file_type: str) -> list[ReportInReview]
         )
 
     return reports
+
+
+def _find_smart(row_dict: dict, keywords: list[str]) -> Optional[str]:
+    """
+    Recherche intelligente : trouve la première colonne dont le nom
+    contient l'un des mots-clés (insensible à la casse).
+    """
+    if not row_dict:
+        return None
+    for key, value in row_dict.items():
+        key_lower = key.lower().strip()
+        for kw in keywords:
+            if kw.lower() in key_lower:
+                if value is not None and str(value).strip() not in (
+                    "",
+                    "Nul",
+                    "null",
+                    "None",
+                ):
+                    return str(value).strip()
+    return None
 
 
 def _find_value_in_row(row_dict: dict, target: str) -> Optional[str]:
