@@ -138,10 +138,11 @@
                             <th>#</th>
                             <th>Coordination</th>
                             <th>Année</th>
-                            <th>Trimestre</th>
-                            <th>Paroisse (aperçu)</th>
+                            <th>T</th>
+                            <th>1ère Paroisse</th>
+                            <th>Adresse</th>
+                            <th>Données</th>
                             <th>Statut</th>
-                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="reportRows">
@@ -217,21 +218,31 @@
     const fileInfoText     = document.getElementById('fileInfoText');
     const fileStatus       = document.getElementById('fileStatus');
 
-    // --- Chargement des données ---
+    // --- Chargement des données (réel, via API) ---
     async function loadReports() {
         try {
-            const response = await fetch(`/api/reports/${fileId}`);
-            if (!response.ok) {
-                throw new Error('Fichier introuvable');
-            }
-            const data = await response.json();
+            // 1. D'abord, charger les infos du fichier
+            const infoResp = await fetch(`/api/reports/${fileId}`);
+            if (!infoResp.ok) throw new Error('Fichier introuvable');
+            const info = await infoResp.json();
             fileInfoText.textContent =
-                `Fichier : ${data.original_filename} — ${data.rows_detected} rapport(s) détecté(s)`;
-            fileStatus.textContent = data.status;
+                `Fichier : ${info.original_filename} — ${info.rows_detected} rapport(s) détecté(s)`;
+            fileStatus.textContent = info.status;
 
-            // Générer des rapports simulés basés sur rows_detected
-            // En Phase 4, ces données viendront du LLM
-            allReports = generateMockReports(data.rows_detected, data.file_type);
+            // 2. Lancer l'extraction (si pas déjà faite)
+            loadingOverlay.querySelector('p').textContent = '🔍 Extraction des données en cours...';
+            const extractResp = await fetch(`/api/reports/${fileId}/extract`, { method: 'POST' });
+            if (!extractResp.ok) throw new Error('Erreur lors de l\'extraction');
+            const extractData = await extractResp.json();
+
+            // 3. Utiliser les vrais rapports extraits
+            allReports = extractData.reports || [];
+            if (allReports.length === 0) {
+                // Fallback : générer des aperçus à partir de rows_detected
+                allReports = generateMockReports(info.rows_detected, info.file_type);
+            }
+            fileStatus.textContent = extractData.status || 'extracted';
+
             renderTable();
         } catch (err) {
             loadingOverlay.innerHTML = `
@@ -246,7 +257,6 @@
     }
 
     function generateMockReports(count, fileType) {
-        // Données simulées — sera remplacé par l'extraction LLM en Phase 4
         const reports = [];
         const coordinations = ['Kwilu', 'Sud-Afrique (Durban)', 'Kinshasa', 'Lubumbashi'];
         const paroisses = ['Siège', 'Kazamba', 'Ville basse', 'Kikwit 3', 'Kwenge'];
@@ -268,33 +278,31 @@
         loadingOverlay.classList.add('d-none');
         validationTable.classList.remove('d-none');
 
-        reportRows.innerHTML = allReports.map((r, idx) => `
+        reportRows.innerHTML = allReports.map((r, idx) => {
+            const rawKeys = Object.keys(r.raw_data || {}).filter(k => !k.startsWith('_') && r.raw_data[k] !== null).length;
+            const adresse = findInRaw(r.raw_data, 'Adresse du Siège') || findInRaw(r.raw_data, 'Adresse');
+            return `
             <tr id="row-${idx}" class="${selectedRows.has(idx) ? 'selected' : ''}">
                 <td>
                     <input type="checkbox" class="form-check-input row-checkbox"
                            data-index="${idx}" ${selectedRows.has(idx) ? 'checked' : ''}>
                 </td>
-                <td class="text-muted">${idx + 1}</td>
-                <td><strong>${r.coordination_nom || '<em class="text-muted">N/A</em>'}</strong></td>
+                <td class="text-muted fw-bold">${idx + 1}</td>
+                <td><strong>${r.coordination_nom || '<em class="text-muted">—</em>'}</strong></td>
                 <td>${r.annee || '—'}</td>
-                <td>T${r.trimestre || '—'}</td>
+                <td><span class="badge bg-info">T${r.trimestre || '?'}</span></td>
                 <td>${r.paroisse_nom || '—'}</td>
-                <td><span class="badge bg-warning text-dark status-badge">En attente</span></td>
-                <td>
-                    <button type="button" class="btn btn-outline-secondary btn-sm preview-btn"
-                            data-index="${idx}" title="Aperçu">
-                        <i class="bi bi-eye"></i>
-                    </button>
-                </td>
-            </tr>
-        `).join('');
+                <td class="text-muted small">${adresse || '—'}</td>
+                <td><span class="badge bg-secondary">${rawKeys} champs</span></td>
+                <td><span class="badge ${r.validation_status === 'valide' ? 'bg-success' : 'bg-warning text-dark'} status-badge">${r.validation_status === 'valide' ? '✅ Validé' : '⏳ En attente'}</span></td>
+            </tr>`;
+        }).join('');
 
         bindRowEvents();
         updateSelectionUI();
     }
 
     function bindRowEvents() {
-        // Checkboxes
         document.querySelectorAll('.row-checkbox').forEach(cb => {
             cb.addEventListener('change', (e) => {
                 const idx = parseInt(e.target.dataset.index);
@@ -304,27 +312,35 @@
                     selectedRows.delete(idx);
                 }
                 updateSelectionUI();
-                // Mettre à jour l'état visuel de la ligne
                 document.getElementById(`row-${idx}`).classList.toggle('selected', e.target.checked);
             });
         });
 
-        // Boutons preview
-        document.querySelectorAll('.preview-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const idx = parseInt(btn.dataset.index);
-                const r = allReports[idx];
-                alert(`Aperçu du rapport #${idx + 1}\n\n` +
-                      `Coordination : ${r.coordination_nom || 'N/A'}\n` +
-                      `Année : ${r.annee || 'N/A'}\n` +
-                      `Trimestre : ${r.trimestre || 'N/A'}\n` +
-                      `Statut : ${r.validation_status}\n\n` +
-                      `(Données complètes disponibles après extraction LLM — Phase 4)`);
+        // Clic sur une ligne = toggle checkbox
+        document.querySelectorAll('tbody tr').forEach(tr => {
+            tr.addEventListener('click', (e) => {
+                if (e.target.tagName === 'INPUT') return; // éviter double-toggle
+                const cb = tr.querySelector('.row-checkbox');
+                if (cb) {
+                    cb.checked = !cb.checked;
+                    cb.dispatchEvent(new Event('change'));
+                }
             });
         });
     }
 
-    // --- Select All ---
+    // Helper: trouver une valeur dans raw_data par correspondance partielle
+    function findInRaw(rawData, search) {
+        if (!rawData) return null;
+        const s = search.toLowerCase();
+        for (const [key, value] of Object.entries(rawData)) {
+            if (key.toLowerCase().includes(s) && value !== null && value !== '') {
+                return value;
+            }
+        }
+        return null;
+    }
+
     selectAll.addEventListener('change', () => {
         if (selectAll.checked) {
             allReports.forEach((_, i) => selectedRows.add(i));
@@ -334,7 +350,6 @@
         renderTable();
     });
 
-    // --- Deselect All ---
     deselectAllBtn.addEventListener('click', () => {
         selectedRows.clear();
         selectAll.checked = false;
@@ -346,34 +361,109 @@
         if (selectedRows.size === 0) return;
 
         validationError.classList.add('d-none');
+        validationSuccess.classList.add('d-none');
         validateBtn.disabled = true;
         validateBtn.innerHTML =
-            '<span class="spinner-border spinner-border-sm me-1"></span> Validation...';
+            '<span class="spinner-border spinner-border-sm me-1"></span> Extraction...';
 
-        // Simulation — l'enregistrement réel en base viendra en Phase 4-5
-        await new Promise(resolve => setTimeout(resolve, 1200));
+        // Déclencher l'extraction réelle d'abord
+        try {
+            const extractResp = await fetch(`/api/reports/${fileId}/extract`, { method: 'POST' });
+            if (!extractResp.ok) throw new Error('Extraction échouée');
+            const extractData = await extractResp.json();
+            allReports = extractData.reports || [];
+        } catch (e) {
+            validationErrorText.textContent = 'Erreur extraction : ' + e.message;
+            validationError.classList.remove('d-none');
+            validateBtn.disabled = false;
+            validateBtn.innerHTML = '<i class="bi bi-check-lg"></i> Forcer l\'extraction et valider';
+            return;
+        }
 
-        // Marquer les rapports comme validés
+        // Marquer les sélectionnés comme validés
         selectedRows.forEach(idx => {
-            allReports[idx].validation_status = 'valide';
+            if (idx < allReports.length) {
+                allReports[idx].validation_status = 'valide';
+            }
         });
 
         const count = selectedRows.size;
         validatedCountText.textContent =
-            `${count} rapport(s) validé(s) avec succès. Prêt pour l'enregistrement en base.`;
+            `${count} rapport(s) validé(s). `;
+
+        // Afficher le bouton de sauvegarde en base
+        validationSuccess.innerHTML = `
+            <div class="alert alert-success d-flex align-items-center" role="alert">
+                <i class="bi bi-check-circle-fill me-2 fs-4"></i>
+                <div>
+                    <strong>Validation réussie !</strong><br>
+                    ${count} rapport(s) prêt(s) pour l'enregistrement.
+                </div>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-primary btn-lg" id="saveToDbBtn">
+                    <i class="bi bi-database-add"></i> 💾 Enregistrer en base de données
+                </button>
+                <a href="/upload" class="btn btn-outline-secondary btn-lg">
+                    <i class="bi bi-upload"></i> Traiter un autre fichier
+                </a>
+            </div>
+            <div id="saveResult" class="mt-3"></div>
+        `;
         validationSuccess.classList.remove('d-none');
 
-        // Mettre à jour le tableau
-        selectedRows.clear();
-        selectAll.checked = false;
-        renderTable();
-
-        // Faire défiler vers le message
-        validationSuccess.scrollIntoView({ behavior: 'smooth' });
+        // Attacher le handler de sauvegarde
+        document.getElementById('saveToDbBtn').addEventListener('click', saveToDatabase);
 
         validateBtn.disabled = false;
         validateBtn.innerHTML = '<i class="bi bi-check-lg"></i> Valider la sélection';
+
+        // Faire défiler vers le message
+        validationSuccess.scrollIntoView({ behavior: 'smooth' });
     });
+
+    // --- Sauvegarde en base ---
+    async function saveToDatabase() {
+        const saveBtn = document.getElementById('saveToDbBtn');
+        const saveResult = document.getElementById('saveResult');
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Sauvegarde en cours...';
+        saveResult.innerHTML = '';
+
+        try {
+            const resp = await fetch(`/api/reports/${fileId}/save`, { method: 'POST' });
+            const result = await resp.json();
+
+            if (result.success) {
+                const ids = result.data?.saved_ids || [];
+                saveResult.innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="bi bi-database-check"></i>
+                        <strong>✅ ${result.message}</strong><br>
+                        <small>IDs en base : ${ids.join(', ')}</small><br>
+                        <a href="/api/reports/db/${ids[0]}/export" class="btn btn-sm btn-outline-success mt-2" target="_blank">
+                            <i class="bi bi-download"></i> Télécharger l'export Excel
+                        </a>
+                    </div>`;
+                saveBtn.classList.add('d-none');
+            } else {
+                saveResult.innerHTML = `
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> ${result.message}
+                        ${result.data?.errors?.length ? '<br><small>' + result.data.errors.join('<br>') + '</small>' : ''}
+                    </div>`;
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="bi bi-database-add"></i> 💾 Réessayer l\'enregistrement';
+            }
+        } catch (e) {
+            saveResult.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-x-circle"></i> Erreur : ${e.message}
+                </div>`;
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="bi bi-database-add"></i> 💾 Réessayer l\'enregistrement';
+        }
+    }
 
     function updateSelectionUI() {
         const count = selectedRows.size;

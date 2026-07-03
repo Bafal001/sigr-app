@@ -160,15 +160,55 @@ def _extract_structured(file_path: Path, file_type: str) -> list[ReportInReview]
             str(k): (v if pd.notna(v) else None) for k, v in row.to_dict().items()
         }
 
+        # Extraire les champs d'aperçu depuis les données brutes
+        coordination_nom = _find_value_in_row(row_dict, "Coordination/Supervision")
+        annee = _parse_int_safe(_find_value_in_row(row_dict, "Année"))
+        trimestre = _parse_int_safe(_find_value_in_row(row_dict, "Trimestre"))
+        paroisse_nom = _find_value_in_row(
+            row_dict, "A. LISTE DES PAROISSES >> 1. >> Paroisse"
+        )
+
         reports.append(
             ReportInReview(
                 row_index=idx,
+                coordination_nom=coordination_nom,
+                annee=annee,
+                trimestre=trimestre,
+                paroisse_nom=paroisse_nom,
                 raw_data=row_dict,
                 validation_status="en_attente",
             )
         )
 
     return reports
+
+
+def _find_value_in_row(row_dict: dict, target: str) -> Optional[str]:
+    """Trouve une valeur dans row_dict par correspondance partielle de clé."""
+    target_lower = target.lower().strip()
+    # Recherche exacte
+    if target in row_dict:
+        val = row_dict[target]
+        return str(val) if val is not None else None
+    # Recherche insensible à la casse
+    for key, value in row_dict.items():
+        if key.lower().strip() == target_lower:
+            return str(value) if value is not None else None
+    # Recherche partielle
+    for key, value in row_dict.items():
+        if target_lower in key.lower():
+            return str(value) if value is not None else None
+    return None
+
+
+def _parse_int_safe(value: Optional[str]) -> Optional[int]:
+    """Convertit une chaîne en entier de manière sécurisée."""
+    if value is None:
+        return None
+    try:
+        return int(float(str(value)))
+    except (ValueError, TypeError):
+        return None
 
 
 def _extract_raw_text(file_path: Path, file_type: str) -> str:
