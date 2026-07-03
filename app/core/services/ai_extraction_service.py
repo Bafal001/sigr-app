@@ -211,12 +211,17 @@ def _extract_structured(file_path: Path, file_type: str) -> list[ReportInReview]
 
 def _find_smart(row_dict: dict, keywords: list[str]) -> Optional[str]:
     """
-    Recherche intelligente : trouve la première colonne dont le nom
-    contient l'un des mots-clés (insensible à la casse).
+    Recherche dans les colonnes de MÉTADONNÉES uniquement (sans '>>').
+    Les colonnes avec '>>' sont des sous-champs, pas des métadonnées.
+    Si le fichier n'a que des sous-champs, retourne None (— affiché).
     """
     if not row_dict:
         return None
+
     for key, value in row_dict.items():
+        # Ignorer les colonnes qui sont des sous-champs (contiennent '>>')
+        if ">>" in str(key):
+            continue
         key_lower = key.lower().strip()
         for kw in keywords:
             if kw.lower() in key_lower:
