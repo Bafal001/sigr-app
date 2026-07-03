@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+{% block title %}SIGR — Validation des Rapports{% endblock %}
+
+{% block extra_head %}
+<style>
+    .validation-header {
+        background: linear-gradient(135deg, #1a5276, #2980b9);
+        color: #fff;
+        border-radius: 12px;
+        padding: 1.5rem 2rem;
+        margin-bottom: 1.5rem;
+    }
+    .table-container {
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        overflow: hidden;
+    }
+    .table {
+        margin-bottom: 0;
+        font-size: 0.9rem;
+    }
+    .table thead th {
+        background: #f8f9fa;
+        border-bottom: 2px solid #dee2e6;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.5px;
+        color: #495057;
+    }
+    .table tbody tr {
+        transition: background 0.15s ease;
+    }
+    .table tbody tr:hover {
+        background: #f0f7ff;
+    }
+    .table tbody tr.selected {
+        background: #e8f5e9;
+    }
+    .status-badge {
+        font-size: 0.75rem;
+        padding: 0.3em 0.7em;
+        border-radius: 20px;
+    }
+    .batch-actions {
+        position: sticky;
+        bottom: 0;
+        background: #fff;
+        border-top: 2px solid #e0e0e0;
+        padding: 1rem 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    .batch-actions .selected-count {
+        font-weight: 600;
+        color: var(--sigr-accent);
+    }
+    .select-all-cell {
+        width: 40px;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: #90a4ae;
+    }
+    .empty-state i {
+        font-size: 5rem;
+    }
+    #loadingOverlay {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 300px;
+    }
+    .pagination-info {
+        font-size: 0.85rem;
+        color: #666;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 1100px;">
+
+    <!-- Indicateur d'étapes -->
+    <div class="step-indicator">
+        <div class="step done"><i class="bi bi-check"></i></div>
+        <div class="step-line done"></div>
+        <div class="step active">2</div>
+        <div class="step-line"></div>
+        <div class="step">3</div>
+    </div>
+    <p class="text-center text-muted mb-4">
+        <small>Upload ✓ → <strong>Validation</strong> → Enregistrement</small>
+    </p>
+
+    <!-- En-tête -->
+    <div class="validation-header" id="fileInfo">
+        <div class="d-flex justify-content-between align-items-center flex-wrap">
+            <div>
+                <h4 class="mb-1"><i class="bi bi-check2-square"></i> Validation des Rapports</h4>
+                <small class="opacity-75" id="fileInfoText">Chargement...</small>
+            </div>
+            <div>
+                <span class="badge bg-light text-dark me-2" id="fileStatus">pending</span>
+                <a href="/upload" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-arrow-left"></i> Retour
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- État de chargement -->
+    <div id="loadingOverlay">
+        <div class="text-center">
+            <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+            <p class="text-muted">Chargement des rapports extraits...</p>
+        </div>
+    </div>
+
+    <!-- Tableau de validation -->
+    <div id="validationTable" class="d-none">
+        <div class="table-container">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th class="select-all-cell">
+                                <input type="checkbox" class="form-check-input" id="selectAll"
+                                       title="Tout sélectionner">
+                            </th>
+                            <th>#</th>
+                            <th>Coordination</th>
+                            <th>Année</th>
+                            <th>Trimestre</th>
+                            <th>Paroisse (aperçu)</th>
+                            <th>Statut</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportRows">
+                        <!-- Rempli dynamiquement par JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Barre d'actions en lot -->
+            <div class="batch-actions">
+                <div>
+                    <span class="selected-count">
+                        <span id="selectedCount">0</span> rapport(s) sélectionné(s)
+                    </span>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm"
+                            id="deselectAllBtn">
+                        <i class="bi bi-x-circle"></i> Tout désélectionner
+                    </button>
+                    <button type="button" class="btn btn-success" id="validateBtn" disabled>
+                        <i class="bi bi-check-lg"></i> Valider la sélection
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Message de succès -->
+        <div id="validationSuccess" class="d-none mt-4">
+            <div class="alert alert-success d-flex align-items-center" role="alert">
+                <i class="bi bi-check-circle-fill me-2 fs-4"></i>
+                <div>
+                    <strong>Validation réussie !</strong><br>
+                    <span id="validatedCountText"></span>
+                </div>
+            </div>
+            <a href="/upload" class="btn btn-primary mt-2">
+                <i class="bi bi-upload"></i> Traiter un autre fichier
+            </a>
+        </div>
+
+        <!-- Message d'erreur -->
+        <div id="validationError" class="d-none mt-4">
+            <div class="alert alert-danger" role="alert" id="validationErrorText"></div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // --- Récupération du file_id depuis l'URL ---
+    const pathParts = window.location.pathname.split('/');
+    const fileId = pathParts[pathParts.length - 1];
+
+    // --- État ---
+    let allReports = [];
+    let selectedRows = new Set();
+
+    // --- Éléments DOM ---
+    const loadingOverlay   = document.getElementById('loadingOverlay');
+    const validationTable  = document.getElementById('validationTable');
+    const reportRows       = document.getElementById('reportRows');
+    const selectAll        = document.getElementById('selectAll');
+    const selectedCount    = document.getElementById('selectedCount');
+    const validateBtn      = document.getElementById('validateBtn');
+    const deselectAllBtn   = document.getElementById('deselectAllBtn');
+    const validationSuccess = document.getElementById('validationSuccess');
+    const validatedCountText = document.getElementById('validatedCountText');
+    const validationError  = document.getElementById('validationError');
+    const validationErrorText = document.getElementById('validationErrorText');
+    const fileInfoText     = document.getElementById('fileInfoText');
+    const fileStatus       = document.getElementById('fileStatus');
+
+    // --- Chargement des données ---
+    async function loadReports() {
+        try {
+            const response = await fetch(`/api/reports/${fileId}`);
+            if (!response.ok) {
+                throw new Error('Fichier introuvable');
+            }
+            const data = await response.json();
+            fileInfoText.textContent =
+                `Fichier : ${data.original_filename} — ${data.rows_detected} rapport(s) détecté(s)`;
+            fileStatus.textContent = data.status;
+
+            // Générer des rapports simulés basés sur rows_detected
+            // En Phase 4, ces données viendront du LLM
+            allReports = generateMockReports(data.rows_detected, data.file_type);
+            renderTable();
+        } catch (err) {
+            loadingOverlay.innerHTML = `
+                <div class="text-center text-danger">
+                    <i class="bi bi-exclamation-circle" style="font-size: 3rem;"></i>
+                    <p class="mt-2">Erreur : ${err.message}</p>
+                    <a href="/upload" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-arrow-left"></i> Retour à l'upload
+                    </a>
+                </div>`;
+        }
+    }
+
+    function generateMockReports(count, fileType) {
+        // Données simulées — sera remplacé par l'extraction LLM en Phase 4
+        const reports = [];
+        const coordinations = ['Kwilu', 'Sud-Afrique (Durban)', 'Kinshasa', 'Lubumbashi'];
+        const paroisses = ['Siège', 'Kazamba', 'Ville basse', 'Kikwit 3', 'Kwenge'];
+        for (let i = 0; i < count; i++) {
+            reports.push({
+                row_index: i,
+                coordination_nom: coordinations[i % coordinations.length],
+                annee: 2026,
+                trimestre: 1,
+                paroisse_nom: paroisses[i % paroisses.length],
+                raw_data: {},
+                validation_status: 'en_attente',
+            });
+        }
+        return reports;
+    }
+
+    function renderTable() {
+        loadingOverlay.classList.add('d-none');
+        validationTable.classList.remove('d-none');
+
+        reportRows.innerHTML = allReports.map((r, idx) => `
+            <tr id="row-${idx}" class="${selectedRows.has(idx) ? 'selected' : ''}">
+                <td>
+                    <input type="checkbox" class="form-check-input row-checkbox"
+                           data-index="${idx}" ${selectedRows.has(idx) ? 'checked' : ''}>
+                </td>
+                <td class="text-muted">${idx + 1}</td>
+                <td><strong>${r.coordination_nom || '<em class="text-muted">N/A</em>'}</strong></td>
+                <td>${r.annee || '—'}</td>
+                <td>T${r.trimestre || '—'}</td>
+                <td>${r.paroisse_nom || '—'}</td>
+                <td><span class="badge bg-warning text-dark status-badge">En attente</span></td>
+                <td>
+                    <button type="button" class="btn btn-outline-secondary btn-sm preview-btn"
+                            data-index="${idx}" title="Aperçu">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+
+        bindRowEvents();
+        updateSelectionUI();
+    }
+
+    function bindRowEvents() {
+        // Checkboxes
+        document.querySelectorAll('.row-checkbox').forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                const idx = parseInt(e.target.dataset.index);
+                if (e.target.checked) {
+                    selectedRows.add(idx);
+                } else {
+                    selectedRows.delete(idx);
+                }
+                updateSelectionUI();
+                // Mettre à jour l'état visuel de la ligne
+                document.getElementById(`row-${idx}`).classList.toggle('selected', e.target.checked);
+            });
+        });
+
+        // Boutons preview
+        document.querySelectorAll('.preview-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.index);
+                const r = allReports[idx];
+                alert(`Aperçu du rapport #${idx + 1}\n\n` +
+                      `Coordination : ${r.coordination_nom || 'N/A'}\n` +
+                      `Année : ${r.annee || 'N/A'}\n` +
+                      `Trimestre : ${r.trimestre || 'N/A'}\n` +
+                      `Statut : ${r.validation_status}\n\n` +
+                      `(Données complètes disponibles après extraction LLM — Phase 4)`);
+            });
+        });
+    }
+
+    // --- Select All ---
+    selectAll.addEventListener('change', () => {
+        if (selectAll.checked) {
+            allReports.forEach((_, i) => selectedRows.add(i));
+        } else {
+            selectedRows.clear();
+        }
+        renderTable();
+    });
+
+    // --- Deselect All ---
+    deselectAllBtn.addEventListener('click', () => {
+        selectedRows.clear();
+        selectAll.checked = false;
+        renderTable();
+    });
+
+    // --- Validation ---
+    validateBtn.addEventListener('click', async () => {
+        if (selectedRows.size === 0) return;
+
+        validationError.classList.add('d-none');
+        validateBtn.disabled = true;
+        validateBtn.innerHTML =
+            '<span class="spinner-border spinner-border-sm me-1"></span> Validation...';
+
+        // Simulation — l'enregistrement réel en base viendra en Phase 4-5
+        await new Promise(resolve => setTimeout(resolve, 1200));
+
+        // Marquer les rapports comme validés
+        selectedRows.forEach(idx => {
+            allReports[idx].validation_status = 'valide';
+        });
+
+        const count = selectedRows.size;
+        validatedCountText.textContent =
+            `${count} rapport(s) validé(s) avec succès. Prêt pour l'enregistrement en base.`;
+        validationSuccess.classList.remove('d-none');
+
+        // Mettre à jour le tableau
+        selectedRows.clear();
+        selectAll.checked = false;
+        renderTable();
+
+        // Faire défiler vers le message
+        validationSuccess.scrollIntoView({ behavior: 'smooth' });
+
+        validateBtn.disabled = false;
+        validateBtn.innerHTML = '<i class="bi bi-check-lg"></i> Valider la sélection';
+    });
+
+    function updateSelectionUI() {
+        const count = selectedRows.size;
+        selectedCount.textContent = count;
+        validateBtn.disabled = count === 0;
+        selectAll.checked = count === allReports.length && allReports.length > 0;
+    }
+
+    // --- Démarrer ---
+    loadReports();
+</script>
+{% endblock %}

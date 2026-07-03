@@ -4,11 +4,13 @@ Point d'entrée principal de l'application FastAPI.
 """
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncGenerator
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 # Chargement des variables d'environnement
 load_dotenv()
@@ -49,9 +51,15 @@ app.add_middleware(
 
 
 # Enregistrement des routeurs
+from app.web.routes.pages import router as pages_router
 from app.web.routes.upload import router as upload_router
 
 app.include_router(upload_router)
+app.include_router(pages_router)
+
+# Fichiers statiques (CSS, JS, images)
+STATIC_DIR = Path(__file__).resolve().parent / "web" / "static"
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 @app.get("/", tags=["Root"])
