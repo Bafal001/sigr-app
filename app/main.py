@@ -48,6 +48,12 @@ app.add_middleware(
 )
 
 
+# Enregistrement des routeurs
+from app.web.routes.upload import router as upload_router
+
+app.include_router(upload_router)
+
+
 @app.get("/", tags=["Root"])
 async def root() -> dict[str, str]:
     """Endpoint racine - Vérification que l'API est en ligne."""
