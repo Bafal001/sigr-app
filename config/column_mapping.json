@@ -1,0 +1,36 @@
+{
+  "_description": "Mapping dynamique entre les clés JSON et les colonnes Excel. Si le modèle Excel change, modifier uniquement ce fichier.",
+  "_version": "1.0.0",
+  "coordination_nom": "Coordination/Supervision",
+  "annee": "Année",
+  "trimestre": "Trimestre",
+  "paroisses": [
+    {
+      "nom": "A. LISTE DES PAROISSES >> 1. >> Paroisse",
+      "adresse": "A. LISTE DES PAROISSES >> 1. >> Adresse",
+      "entite": "A. LISTE DES PAROISSES >> 1. >> Entité",
+      "nature_parcelle": "A. LISTE DES PAROISSES >> 1. >> Nature Parcelle"
+    }
+  ],
+  "pastorales_hommes": "B. ACTIVITES PASTORALES >> Bandimi Hommes >> Nombre",
+  "pastorales_femmes": "B. ACTIVITES PASTORALES >> Bandimi Femmes >> Nombre",
+  "pastorales_sika_hommes": "B. ACTIVITES PASTORALES >> Sika Hommes >> Nombre",
+  "pastorales_sika_femmes": "B. ACTIVITES PASTORALES >> Sika Femmes >> Nombre",
+  "pastorales_bazongeli": "B. ACTIVITES PASTORALES >> Bazongeli >> Nombre",
+  "pastorales_bapteme_h": "B. ACTIVITES PASTORALES >> Baptême Hommes >> Nombre",
+  "pastorales_bapteme_f": "B. ACTIVITES PASTORALES >> Baptême Femmes >> Nombre",
+  "pastorales_audiences_h": "B. ACTIVITES PASTORALES >> Audiences Hommes >> Nombre",
+  "pastorales_audiences_f": "B. ACTIVITES PASTORALES >> Audiences Femmes >> Nombre",
+  "pastorales_mariages_bandimi": "B. ACTIVITES PASTORALES >> Mariages Bandimi >> Nombre",
+  "pastorales_mariages_bakambi": "B. ACTIVITES PASTORALES >> Mariages Bakambi >> Nombre",
+  "pastorales_autorisations_ndako": "B. ACTIVITES PASTORALES >> Autorisations Ndako >> Nombre",
+  "pastorales_autorisations_malades": "B. ACTIVITES PASTORALES >> Autorisations Malades >> Nombre",
+  "pastorales_ceremonies_bapteme": "B. ACTIVITES PASTORALES >> Cérémonies Baptême >> Nombre",
+  "pastorales_reunions_basali": "B. ACTIVITES PASTORALES >> Réunions Basali >> Nombre",
+  "pastorales_formations_bateyi": "B. ACTIVITES PASTORALES >> Formations Bateyi >> Nombre",
+  "prophetiques_controle_h": "C. ACTIVITES PROPHETIQUES >> Contrôle Hommes >> Nombre",
+  "prophetiques_controle_f": "C. ACTIVITES PROPHETIQUES >> Contrôle Femmes >> Nombre",
+  "dos_mama": "ACTIVITES DE LA DOS >> Mama >> Nombre",
+  "dos_garcons": "ACTIVITES DE LA DOS >> Garçons >> Nombre",
+  "dos_filles": "ACTIVITES DE LA DOS >> Filles >> Nombre"
+}

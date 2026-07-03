@@ -1,4 +1,45 @@
-venv/
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Environnement virtuel
+venv/
+.venv/
+env/
 .env
-.DS_Store 
+
+# Base de données
+*.db
+*.sqlite3
+data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploads temporaires
+uploads/
+temp/
+
+# Rapports de test
+htmlcov/
+.coverage
+.pytest_cache/
+
+# Docker
+.docker/
+
+# Logs
+*.log
