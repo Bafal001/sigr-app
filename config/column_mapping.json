@@ -1,36 +1,318 @@
 {
-  "_description": "Mapping dynamique entre les clés JSON et les colonnes Excel. Si le modèle Excel change, modifier uniquement ce fichier.",
-  "_version": "1.0.0",
-  "coordination_nom": "Coordination/Supervision",
-  "annee": "Année",
-  "trimestre": "Trimestre",
-  "paroisses": [
-    {
-      "nom": "A. LISTE DES PAROISSES >> 1. >> Paroisse",
-      "adresse": "A. LISTE DES PAROISSES >> 1. >> Adresse",
-      "entite": "A. LISTE DES PAROISSES >> 1. >> Entité",
-      "nature_parcelle": "A. LISTE DES PAROISSES >> 1. >> Nature Parcelle"
+  "_description": "Mapping dynamique entre les clés internes (JSON/DB) et les colonnes du fichier Excel. Si le modèle Excel change, modifier uniquement ce fichier.",
+  "_version": "2.0.0",
+  "_excel_model": "Rapports_1_Trimestre_20262026-07-03_06_54_42.xlsx",
+
+  "metadata": {
+    "date_soumission": "Submission Date",
+    "ip_soumission": "Submission IP",
+    "id_soumission": "Submission ID",
+    "date_mise_a_jour": "Last Update Date",
+    "coordination_nom": "Coordination/Supervision",
+    "annee": "Année",
+    "trimestre": "Trimestre",
+    "coordination_adresse": "Adresse du Siège de la Coordination/Supervision",
+    "coordination_email": "Email de la Coordination/Supervision",
+    "coordination_telephone": "Numéro de téléphone"
+  },
+
+  "paroisses": {
+    "_section": "A. LISTE DES PAROISSES",
+    "_repeat": true,
+    "_max": 25,
+    "_fields": {
+      "nom": "Paroisse",
+      "adresse": "Adresse",
+      "entite": "Entité (Ville, Territoire, Village...)",
+      "nature_parcelle": "Nature Parcelle"
     }
-  ],
-  "pastorales_hommes": "B. ACTIVITES PASTORALES >> Bandimi Hommes >> Nombre",
-  "pastorales_femmes": "B. ACTIVITES PASTORALES >> Bandimi Femmes >> Nombre",
-  "pastorales_sika_hommes": "B. ACTIVITES PASTORALES >> Sika Hommes >> Nombre",
-  "pastorales_sika_femmes": "B. ACTIVITES PASTORALES >> Sika Femmes >> Nombre",
-  "pastorales_bazongeli": "B. ACTIVITES PASTORALES >> Bazongeli >> Nombre",
-  "pastorales_bapteme_h": "B. ACTIVITES PASTORALES >> Baptême Hommes >> Nombre",
-  "pastorales_bapteme_f": "B. ACTIVITES PASTORALES >> Baptême Femmes >> Nombre",
-  "pastorales_audiences_h": "B. ACTIVITES PASTORALES >> Audiences Hommes >> Nombre",
-  "pastorales_audiences_f": "B. ACTIVITES PASTORALES >> Audiences Femmes >> Nombre",
-  "pastorales_mariages_bandimi": "B. ACTIVITES PASTORALES >> Mariages Bandimi >> Nombre",
-  "pastorales_mariages_bakambi": "B. ACTIVITES PASTORALES >> Mariages Bakambi >> Nombre",
-  "pastorales_autorisations_ndako": "B. ACTIVITES PASTORALES >> Autorisations Ndako >> Nombre",
-  "pastorales_autorisations_malades": "B. ACTIVITES PASTORALES >> Autorisations Malades >> Nombre",
-  "pastorales_ceremonies_bapteme": "B. ACTIVITES PASTORALES >> Cérémonies Baptême >> Nombre",
-  "pastorales_reunions_basali": "B. ACTIVITES PASTORALES >> Réunions Basali >> Nombre",
-  "pastorales_formations_bateyi": "B. ACTIVITES PASTORALES >> Formations Bateyi >> Nombre",
-  "prophetiques_controle_h": "C. ACTIVITES PROPHETIQUES >> Contrôle Hommes >> Nombre",
-  "prophetiques_controle_f": "C. ACTIVITES PROPHETIQUES >> Contrôle Femmes >> Nombre",
-  "dos_mama": "ACTIVITES DE LA DOS >> Mama >> Nombre",
-  "dos_garcons": "ACTIVITES DE LA DOS >> Garçons >> Nombre",
-  "dos_filles": "ACTIVITES DE LA DOS >> Filles >> Nombre"
+  },
+
+  "activite_pastorale": {
+    "_section": "B. ACTIVITES PASTORALES",
+    "_fields": {
+      "bandimi_hommes": "Bandimi Hommes >> Nombre",
+      "bandimi_femmes": "Bandimi Femmes >> Nombre",
+      "sika_hommes": "Bandimi ya Sika Hommes >> Nombre",
+      "sika_femmes": "Bandimi ya Sika Femmes >> Nombre",
+      "bazongeli_hommes": "Bazongeli Bolingo Hommes >> Nombre"
+    }
+  },
+
+  "activite_prophetique": {
+    "_section": "C. ACTIVITES PROPHETIQUES",
+    "_fields": {
+      "controle_hommes": "Contrôle Hommes >> Nombre",
+      "controle_femmes": "Contrôle Femmes >> Nombre",
+      "controle_general_hommes": "Contrôle Général Hommes >> Nombre",
+      "controle_general_femmes": "Contrôle Général Femmes >> Nombre",
+      "nb_controle_general": "Nombre de fois Contrôle Général/Trimestre >> Nombre",
+      "formations_basakoli": "Formations Basakoli >> Nombre",
+      "basakoli_en_formation": "Basakoli en Formation >> Nombre"
+    }
+  },
+
+  "medecine_homme": {
+    "_section": "D. ACTIVITES MEDECINE-HOMME",
+    "_fields": {
+      "nb_controles": "Nombre de fois Contrôle Médecine-Homme/Trimestre >> Nombre",
+      "baleki_mikolo": "Bandimi Baleki Contrôle Médecine-Homme (Mikolo) >> Nombre",
+      "baleki_bilenge": "Bandimi Baleki Contrôle Médecine-Homme (Bilenge) >> Nombre",
+      "gueris_mikolo": "Malades Guéris (Mikolo) >> Nombre",
+      "gueris_bilenge": "Malades Guéris (Bilenge) >> Nombre",
+      "non_gueris_mikolo": "Malades Non-Guéris (Mikolo) >> Nombre",
+      "non_gueris_bilenge": "Malades Non-Guéris (Bilenge) >> Nombre",
+      "maladies_frequentes": "Constat Maladies Fréquentes"
+    }
+  },
+
+  "mariages": {
+    "_section": "A. LIPAMBOLI YA LIBALA",
+    "_repeat": true,
+    "_max": 12,
+    "_fields": {
+      "date": "Date",
+      "epoux_nom": "Nom de l'Epoux",
+      "epouse_nom": "Nom de l\"Epouse",
+      "paroisse": "Paroisse",
+      "observation": "Observation"
+    }
+  },
+
+  "formations": {
+    "_description": "6 types de formation, chaque type a jusqu'à 12 sessions",
+    "mibali": {
+      "_section": "FORMATION BASALI YA MIBALI",
+      "_repeat": true,
+      "_max": 12,
+      "_fields": {
+        "date": "Date",
+        "theme": "Thème",
+        "formateur": "Nom du Formateur",
+        "observation": "Observations"
+      }
+    },
+    "bolingo": {
+      "_section": "FORMATION BASALI YA BOLINGO",
+      "_repeat": true,
+      "_max": 12,
+      "_fields": {
+        "date": "Date",
+        "theme": "Thème",
+        "formateur": "Nom du Formateur",
+        "observation": "Observations"
+      }
+    },
+    "basi": {
+      "_section": "FORMATION BASALI YA BASI",
+      "_repeat": true,
+      "_max": 12,
+      "_fields": {
+        "date": "Date",
+        "theme": "Thème",
+        "formateur": "Nom du Formateur",
+        "observation": "Observations"
+      }
+    },
+    "basakoli": {
+      "_section": "FORMATION YA BASAKOLI",
+      "_repeat": true,
+      "_max": 12,
+      "_fields": {
+        "date": "Date",
+        "theme": "Thème",
+        "formateur": "Nom du Formateur",
+        "observation": "Observations"
+      }
+    },
+    "disciples": {
+      "_section": "FORMATION YA BA DISCIPLES",
+      "_repeat": true,
+      "_max": 12,
+      "_fields": {
+        "date": "Date",
+        "theme": "Thème",
+        "formateur": "Nom du Formateur",
+        "observation": "Observations"
+      }
+    },
+    "jeunesses": {
+      "_section": "FORMATION YA BA JEUNESSES",
+      "_repeat": true,
+      "_max": 12,
+      "_fields": {
+        "date": "Date",
+        "theme": "Thème",
+        "formateur": "Nom du Formateur",
+        "observation": "Observations"
+      }
+    }
+  },
+
+  "patrimoine_immobilier": {
+    "_section": "B. ETAT DE LIEUX DES PROPRIETES IMMOBILIERES DE L'EGLISE",
+    "_repeat": true,
+    "_max": 40,
+    "_fields": {
+      "entite": "Entité",
+      "paroisse": "Paroisse",
+      "localisation": "Localisation",
+      "superficie": "Superficie",
+      "mise_en_valeur": "Mise en Valeur",
+      "observation": "Observation"
+    }
+  },
+
+  "activite_dos": {
+    "_section": "ACTIVITES DE LA DOS",
+    "_fields": {
+      "mama": "Mama >> Nombre",
+      "garcons": "Garçons >> Nombre",
+      "filles": "Filles >> Nombre",
+      "cas_maladie_mama": "Cas Maladie (Mama) >> Nombre",
+      "cas_maladie_garcons": "Cas Maladie (Garçons) >> Nombre",
+      "cas_maladie_filles": "Cas Maladie (Filles) >> Nombre",
+      "onction_huile_mo": "Onction D'Huile Mama (M.O.) >> Nombre",
+      "onction_huile_mp": "Onction D'Huile Mama (M.P.) >> Nombre",
+      "onction_huile_garcons": "Onction D'Huile (Garçons) >> Nombre",
+      "onction_huile_filles": "Onction D'Huile (Filles) >> Nombre",
+      "cantiques_3_8": "Cantiques 3&8 >> Nombre",
+      "cantiques_6_8": "Cantiques 6&8 >> Nombre",
+      "bana_babotami_garcons": "Bana Babotami (Garçons) >> Nombre",
+      "bana_babotami_filles": "Bana Babotami (Filles) >> Nombre",
+      "bana_bayambami_garcons": "Bana Bayambami (Garçons) >> Nombre",
+      "bana_bayambami_filles": "Bana Bayambami (Filles) >> Nombre",
+      "kimia_mama": "Kimia Lobiko (Mama) >> Nombre",
+      "kimia_garcons": "Kimia Lobiko (Garçons) >> Nombre",
+      "kimia_filles": "Kimia Lobiko (Filles) >> Nombre",
+      "mama_zemi": "Mama Zemi >> Nombre",
+      "mobali_butu": "Mobali ya Butu >> Nombre",
+      "basi_bakufeli": "Basi Bakufeli Mibali >> Nombre",
+      "mondimi_sika": "Mondimi ya Sika >> Nombre"
+    }
+  },
+
+  "activite_musique": {
+    "_section": "ACTIVITES DEPARTEMENT MUSIQUE",
+    "_fields": {
+      "production": "Production par Paroisse >> Nombre",
+      "encadrement": "Encadrement >> Nombre",
+      "concert": "Concert Casting >> Nombre",
+      "fete_bana": "Fête Bana Molimo >> Nombre",
+      "chorales": "Chorales >> Nombre",
+      "choriste_bilenge": "Choriste Bilenge >> Nombre",
+      "choriste_tata": "Choriste Ba Tata >> Nombre",
+      "choriste_mama": "Choriste Ba Mama >> Nombre",
+      "choriste_junior": "Choriste Junior >> Nombre",
+      "choriste_departement": "Choriste Département >> Nombre",
+      "choriste_celibataires": "Choriste Célibataires >> Nombre",
+      "choriste_maries": "Choriste Mariés >> Nombre",
+      "choriste_veufs": "Choriste Veufs >> Nombre",
+      "choriste_veuves": "Choriste Veuves >> Nombre",
+      "choriste_deces": "Choriste Décès >> Nombre",
+      "table_mixeur": "Table Mixeur >> Nombre",
+      "micro": "Micro >> Nombre",
+      "baffle": "Baffle >> Nombre",
+      "piano": "Piano >> Nombre",
+      "trepied": "Trépied >> Nombre",
+      "cable": "Câble >> Nombre",
+      "percussion": "Percussion >> Nombre",
+      "uniforme": "Uniforme >> Nombre",
+      "projecteur": "Projecteur >> Nombre"
+    }
+  },
+
+  "activite_jeunesse": {
+    "_section": "ACTIVITES ENCADREMENT DES JEUNES",
+    "_fields": {
+      "scouts": "Scouts >> Nombre",
+      "zeke": "Bilenge Zeke >> Nombre",
+      "louveteaux": "Louveteaux >> Nombre",
+      "production": "Production par Paroisse >> Nombre",
+      "colonie": "Nombre de fois Colonie de Vacances >> Nombre",
+      "fete_bana": "Fête Bana Molimo >> Nombre",
+      "garcons": "Garcons >> Nombre",
+      "filles": "Filles >> Nombre",
+      "celibataires": "Célibataires >> Nombre",
+      "maries": "Mariés >> Nombre",
+      "veufs": "Veufs >> Nombre",
+      "veuves": "Veuves >> Nombre",
+      "deces": "Décès >> Nombre",
+      "chemises_vertes": "Chemises Vertes >> Nombre",
+      "foulards": "Foulards >> Nombre",
+      "chemises_kaki": "Chemises Kaki >> Nombre",
+      "robes_zeke": "Robes Zeke >> Nombre",
+      "gans": "Gans >> Nombre",
+      "chausettes": "Chausettes >> Nombre"
+    }
+  },
+
+  "dirigeant_musical": {
+    "_section": "LISTE DES DIRIGEANTS MUSICAUX",
+    "_repeat": true,
+    "_max": 40,
+    "_fields": {
+      "localisation": "Localisation",
+      "paroisse": "Paroisse",
+      "nom": "Nom",
+      "echelon": "Echelon",
+      "fonction": "Fonction",
+      "onction": "Onction",
+      "likabo": "Likabo",
+      "statut": "Statut",
+      "naissance": "Naissance",
+      "etat_civil": "Etat Civil",
+      "contact": "Con tact"
+    }
+  },
+
+  "encadreur_jeunesse": {
+    "_section": "LISTE DES ENCADREURS/ENCADREUSES JEUNESSE",
+    "_repeat": true,
+    "_max": 40,
+    "_fields": {
+      "localisation": "Localisation",
+      "paroisse": "Paroisse",
+      "nom": "Nom",
+      "echelon": "Echelon",
+      "fonction": "Fonction",
+      "onction": "Onction",
+      "likabo": "Likabo",
+      "statut": "Statut",
+      "naissance": "Naissance",
+      "etat_civil": "Etat Civil",
+      "contact": "Con tact"
+    }
+  },
+
+  "commentaires": {
+    "_fields": {
+      "paroisses": "Commentaires sur les Paroisses",
+      "activites_pastorales": "Commentaires sur les Activités Pastorales",
+      "activites_prophetiques": "Commentaires sur les Activités Prophétiques",
+      "medecine_homme": "Commentaires Médecine-Homme",
+      "mariages": "Commentaires Lipamboli ya Libala",
+      "formations": "Commentaires sur les Formations",
+      "immobilier": "Commentaires Immobiliers Eglise",
+      "dos": "Commentaires DOS",
+      "musique": "Commentaires jeunesse Musique",
+      "jeunesse": "Commentaires Encadrement des Jeunes"
+    }
+  },
+
+  "conclusion": {
+    "_field": "Ecrivez la Conclusion de votre Rapport ici..."
+  },
+
+  "signataires": {
+    "_fields": {
+      "coordinateur": "NOM DU COORDINATEUR/SUPERVISEUR",
+      "charge_propheties": "NOM DU CHARGE DES PROPHETIES",
+      "charge_dos": "NOM DU CHARGE DE LA DOS",
+      "secretaire": "NOM DU SECRETAIRE",
+      "charge_tresor": "NOM DU CHARGE DE TRESOR",
+      "dirigeant_musical": "NOM DU DIRIGEANT MUSICAL",
+      "encadreur_jeunesse": "NOM ENCADREUR JEUNESSE"
+    }
+  }
 }
