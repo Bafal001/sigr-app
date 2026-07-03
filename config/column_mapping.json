@@ -30,12 +30,25 @@
 
   "activite_pastorale": {
     "_section": "B. ACTIVITES PASTORALES",
+    "_description": "17 champs conformément au modèle de données. Les champs absents du fichier Excel seront peuplés via LLM (PDF/Word).",
     "_fields": {
-      "bandimi_hommes": "Bandimi Hommes >> Nombre",
-      "bandimi_femmes": "Bandimi Femmes >> Nombre",
+      "hommes": "Bandimi Hommes >> Nombre",
+      "femmes": "Bandimi Femmes >> Nombre",
       "sika_hommes": "Bandimi ya Sika Hommes >> Nombre",
       "sika_femmes": "Bandimi ya Sika Femmes >> Nombre",
-      "bazongeli_hommes": "Bazongeli Bolingo Hommes >> Nombre"
+      "bazongeli_hommes": "Bazongeli Bolingo Hommes >> Nombre",
+      "bazongeli_femmes": "Bazongeli Bolingo Femmes >> Nombre",
+      "bapteme_h": "Baptême Hommes >> Nombre",
+      "bapteme_f": "Baptême Femmes >> Nombre",
+      "audiences_h": "Audiences Hommes >> Nombre",
+      "audiences_f": "Audiences Femmes >> Nombre",
+      "mariages_bandimi": "Mariages Bandimi >> Nombre",
+      "mariages_bakambi": "Mariages Bakambi >> Nombre",
+      "autorisations_ndako": "Autorisations Ndako >> Nombre",
+      "autorisations_malades": "Autorisations Malades >> Nombre",
+      "ceremonies_bapteme": "Cérémonies Baptême >> Nombre",
+      "reunions_basali": "Réunions Basali >> Nombre",
+      "formations_bateyi": "Formations Bateyi >> Nombre"
     }
   },
 
