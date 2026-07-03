@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+{% block title %}SIGR — Upload de Rapports{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Zone de Drag & Drop */
+    .drop-zone {
+        border: 3px dashed #b0bec5;
+        border-radius: 16px;
+        padding: 3rem 2rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background: #fafbfc;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+        border-color: var(--sigr-accent);
+        background: #e8f0fe;
+        transform: scale(1.01);
+    }
+    .drop-zone.dragover {
+        border-style: solid;
+        box-shadow: 0 0 0 6px rgba(41, 128, 185, 0.15);
+    }
+    .drop-zone i {
+        font-size: 4rem;
+        color: #b0bec5;
+        transition: color 0.3s ease;
+    }
+    .drop-zone:hover i, .drop-zone.dragover i {
+        color: var(--sigr-accent);
+    }
+    .drop-zone .drop-text {
+        font-size: 1.2rem;
+        color: #607d8b;
+        margin-top: 0.5rem;
+    }
+    .drop-zone .drop-hint {
+        font-size: 0.85rem;
+        color: #90a4ae;
+        margin-top: 0.25rem;
+    }
+    /* Barre de progression */
+    .progress {
+        height: 8px;
+        border-radius: 4px;
+    }
+    .upload-result {
+        animation: fadeIn 0.4s ease;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(12px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    /* File info badge */
+    .file-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        background: #e8f5e9;
+        color: #2e7d32;
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 720px;">
+
+    <!-- Indicateur d'étapes -->
+    <div class="step-indicator">
+        <div class="step active">1</div>
+        <div class="step-line"></div>
+        <div class="step">2</div>
+        <div class="step-line"></div>
+        <div class="step">3</div>
+    </div>
+    <p class="text-center text-muted mb-4">
+        <small>Upload → Validation → Enregistrement</small>
+    </p>
+
+    <!-- Carte Upload -->
+    <div class="card">
+        <div class="card-body p-4">
+            <h4 class="card-title mb-3">
+                <i class="bi bi-cloud-upload text-primary"></i>
+                Déposer un fichier de rapport
+            </h4>
+            <p class="text-muted mb-4">
+                Formats acceptés : <strong>PDF, DOCX, XLSX, CSV</strong>.
+                Pour les fichiers Excel, chaque ligne sera traitée comme un rapport distinct.
+            </p>
+
+            <!-- Zone Drag & Drop -->
+            <div class="drop-zone mb-3" id="dropZone">
+                <i class="bi bi-file-earmark-arrow-up d-block"></i>
+                <div class="drop-text">
+                    Glissez-déposez votre fichier ici
+                </div>
+                <div class="drop-hint">
+                    ou cliquez pour parcourir
+                </div>
+                <input type="file" id="fileInput" hidden
+                       accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,.txt">
+            </div>
+
+            <!-- Fichier sélectionné -->
+            <div id="selectedFile" class="d-none mb-3">
+                <div class="file-badge">
+                    <i class="bi bi-file-earmark-check"></i>
+                    <span id="selectedFileName"></span>
+                    <button type="button" class="btn btn-sm btn-outline-danger ms-2"
+                            id="clearFileBtn" title="Retirer">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Barre de progression -->
+            <div id="progressSection" class="d-none mb-3">
+                <div class="d-flex justify-content-between mb-1">
+                    <small class="text-muted" id="progressLabel">Upload en cours...</small>
+                    <small class="text-muted" id="progressPercent">0%</small>
+                </div>
+                <div class="progress">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated"
+                         id="progressBar" role="progressbar" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Bouton Upload -->
+            <button type="button" class="btn btn-primary btn-lg w-100"
+                    id="uploadBtn" disabled>
+                <i class="bi bi-upload"></i> Uploader le fichier
+            </button>
+
+            <!-- Résultat -->
+            <div id="uploadResult" class="d-none mt-4 upload-result"></div>
+        </div>
+    </div>
+
+    <!-- Cartes d'information -->
+    <div class="row mt-4 g-3">
+        <div class="col-sm-4">
+            <div class="card text-center p-3">
+                <i class="bi bi-filetype-pdf text-danger" style="font-size: 2rem;"></i>
+                <small class="text-muted mt-1">PDF (texte & OCR)</small>
+            </div>
+        </div>
+        <div class="col-sm-4">
+            <div class="card text-center p-3">
+                <i class="bi bi-filetype-docx text-primary" style="font-size: 2rem;"></i>
+                <small class="text-muted mt-1">Word (DOCX)</small>
+            </div>
+        </div>
+        <div class="col-sm-4">
+            <div class="card text-center p-3">
+                <i class="bi bi-filetype-xlsx text-success" style="font-size: 2rem;"></i>
+                <small class="text-muted mt-1">Excel (lots)</small>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // --- Éléments DOM ---
+    const dropZone    = document.getElementById('dropZone');
+    const fileInput   = document.getElementById('fileInput');
+    const uploadBtn   = document.getElementById('uploadBtn');
+    const selectedFile = document.getElementById('selectedFile');
+    const selectedFileName = document.getElementById('selectedFileName');
+    const clearFileBtn = document.getElementById('clearFileBtn');
+    const progressSection = document.getElementById('progressSection');
+    const progressBar  = document.getElementById('progressBar');
+    const progressPercent = document.getElementById('progressPercent');
+    const progressLabel = document.getElementById('progressLabel');
+    const uploadResult = document.getElementById('uploadResult');
+
+    let currentFile = null;
+
+    // --- Drag & Drop ---
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleFileSelect(files[0]);
+        }
+    });
+
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length > 0) {
+            handleFileSelect(fileInput.files[0]);
+        }
+    });
+
+    clearFileBtn.addEventListener('click', () => {
+        currentFile = null;
+        fileInput.value = '';
+        selectedFile.classList.add('d-none');
+        uploadBtn.disabled = true;
+        uploadResult.classList.add('d-none');
+    });
+
+    function handleFileSelect(file) {
+        currentFile = file;
+        selectedFileName.textContent = file.name + ` (${formatFileSize(file.size)})`;
+        selectedFile.classList.remove('d-none');
+        uploadBtn.disabled = false;
+        uploadResult.classList.add('d-none');
+    }
+
+    // --- Upload ---
+    uploadBtn.addEventListener('click', () => {
+        if (!currentFile) return;
+        doUpload(currentFile);
+    });
+
+    async function doUpload(file) {
+        // Afficher la progression
+        uploadBtn.disabled = true;
+        uploadResult.classList.add('d-none');
+        progressSection.classList.remove('d-none');
+        progressLabel.textContent = 'Upload en cours...';
+        updateProgress(0);
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData,
+            });
+
+            updateProgress(100);
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || 'Erreur lors de l\'upload');
+            }
+
+            const data = await response.json();
+            progressLabel.textContent = '✅ Fichier reçu avec succès !';
+
+            // Afficher le résultat
+            showUploadSuccess(data);
+
+        } catch (error) {
+            progressLabel.textContent = '❌ Erreur';
+            showUploadError(error.message);
+        } finally {
+            uploadBtn.disabled = false;
+            currentFile = null;
+            fileInput.value = '';
+            selectedFile.classList.add('d-none');
+        }
+    }
+
+    function updateProgress(percent) {
+        progressBar.style.width = percent + '%';
+        progressBar.setAttribute('aria-valuenow', percent);
+        progressPercent.textContent = percent + '%';
+    }
+
+    function showUploadSuccess(data) {
+        uploadResult.classList.remove('d-none');
+        uploadResult.innerHTML = `
+            <div class="alert alert-success d-flex align-items-center" role="alert">
+                <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+                <div>
+                    <strong>Fichier reçu !</strong><br>
+                    <small>${data.rows_detected} rapports détectés dans ce fichier.</small>
+                </div>
+            </div>
+            <a href="/validation/${data.file_id}" class="btn btn-success w-100 mt-2">
+                <i class="bi bi-check2-square"></i> Valider les ${data.rows_detected} rapports
+            </a>
+            <div class="text-muted mt-3">
+                <small><strong>Détails techniques :</strong></small>
+                <ul class="small text-muted mb-0 mt-1">
+                    <li>File ID : <code>${data.file_id}</code></li>
+                    <li>Type : <span class="badge bg-secondary">${data.file_type}</span></li>
+                    <li>Lignes : <strong>${data.rows_detected}</strong></li>
+                </ul>
+            </div>
+        `;
+    }
+
+    function showUploadError(message) {
+        uploadResult.classList.remove('d-none');
+        uploadResult.innerHTML = `
+            <div class="alert alert-danger d-flex align-items-center" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+                <div>${message}</div>
+            </div>
+        `;
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' o';
+        if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' Ko';
+        return (bytes / 1048576).toFixed(1) + ' Mo';
+    }
+</script>
+{% endblock %}
