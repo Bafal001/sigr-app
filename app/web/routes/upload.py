@@ -159,6 +159,76 @@ async def extract_file_data(file_id: str) -> FileDetail:
 
 
 # ---------------------------------------------------------------------------
+# POST /api/reports/{file_id}/save
+# ---------------------------------------------------------------------------
+@router.post(
+    "/reports/{file_id}/save",
+    response_model=APIResponse,
+    summary="Sauvegarder les rapports en base de données",
+    description="Valide et enregistre les rapports extraits dans SQLite.",
+)
+async def save_reports(file_id: str) -> APIResponse:
+    """
+    Sauvegarde les rapports extraits d'un fichier dans la base SQLite.
+    """
+    detail = report_service.extract_and_get_reports(file_id)
+    if detail is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Fichier avec l'ID '{file_id}' introuvable.",
+        )
+
+    saved_ids: list[int] = []
+    errors: list[str] = []
+
+    for report in detail.reports:
+        if not report.raw_data:
+            continue
+        try:
+            rid = report_service.save_report_to_db(report.raw_data)
+            saved_ids.append(rid)
+        except Exception as e:
+            errors.append(f"Ligne {report.row_index}: {str(e)}")
+
+    return APIResponse(
+        success=len(errors) == 0,
+        message=f"{len(saved_ids)} rapports sauvegardés."
+        + (f" {len(errors)} erreurs." if errors else ""),
+        data={"saved_ids": saved_ids, "errors": errors},
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /api/reports/db/{rapport_id}/export
+# ---------------------------------------------------------------------------
+@router.get(
+    "/reports/db/{rapport_id}/export",
+    summary="Exporter un rapport en Excel",
+    description="Génère un fichier .xlsx conforme au modèle à partir des données SQLite.",
+)
+async def export_rapport(rapport_id: int):
+    """
+    Exporte un rapport depuis SQLite vers un fichier Excel.
+    """
+    from fastapi.responses import FileResponse
+
+    from app.core.services.excel_export_service import export_rapport_to_excel
+
+    try:
+        output_path = export_rapport_to_excel(rapport_id)
+        return FileResponse(
+            path=str(output_path),
+            filename=f"rapport_{rapport_id}.xlsx",
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+
+
+# ---------------------------------------------------------------------------
 # DELETE /api/reports/{file_id}
 # ---------------------------------------------------------------------------
 @router.delete(

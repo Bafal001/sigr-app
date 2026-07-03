@@ -257,3 +257,181 @@ def extract_and_get_reports(file_id: str) -> Optional[FileDetail]:
     detail.status = "extracted"
 
     return detail
+
+
+def save_report_to_db(report_data: dict) -> int:
+    """
+    Sauvegarde un rapport structuré dans la base SQLite.
+    Utilise le Mapper pour transformer les données brutes.
+
+    Args:
+        report_data: Données structurées du rapport (JSON LLM ou ligne Excel mappée).
+
+    Returns:
+        ID du rapport créé dans la base.
+
+    Raises:
+        ValueError: Si les données sont invalides.
+    """
+    from app.core.services.mapper import (
+        map_llm_json_to_db,
+        map_excel_row_to_db,
+    )
+
+    # Déterminer la source (LLM ou Excel) et mapper
+    # Si les données ont déjà les sections SIGR, c'est du LLM
+    if "metadata" in report_data and "activite_pastorale" in report_data:
+        mapped = map_llm_json_to_db(report_data)
+    else:
+        mapped = map_excel_row_to_db(report_data)
+
+    # Insérer dans la base
+    rapport_id = _insert_rapport(mapped)
+    return rapport_id
+
+
+def _insert_rapport(data: dict) -> int:
+    """
+    Insère un rapport complet (toutes sections) dans SQLite.
+    Retourne l'ID du rapport créé.
+    """
+    from app.core.models.models import (
+        ActiviteDOS,
+        ActiviteJeunesse,
+        ActiviteMusique,
+        ActivitePastorale,
+        ActiviteProphetique,
+        Commentaire,
+        Conclusion,
+        Coordination,
+        DirigeantMusical,
+        EncadreurJeunesse,
+        Formation,
+        InventaireIntendance,
+        Mariage,
+        MedecineHomme,
+        Paroisse,
+        PatrimoineImmobilier,
+        Rapport,
+        Signataire,
+    )
+    from app.infrastructure.database.session import SessionLocal
+
+    db = SessionLocal()
+    try:
+        metadata = data.get("metadata", {})
+
+        # 1. Coordination (créer ou récupérer)
+        coord_name = metadata.get("coordination_nom")
+        if coord_name:
+            coordination = (
+                db.query(Coordination).filter(Coordination.nom == coord_name).first()
+            )
+            if coordination is None:
+                coordination = Coordination(
+                    nom=coord_name,
+                    adresse=metadata.get("coordination_adresse"),
+                    email=metadata.get("coordination_email"),
+                    telephone=metadata.get("coordination_telephone"),
+                )
+                db.add(coordination)
+                db.flush()
+        else:
+            coordination = Coordination(nom="Inconnue")
+            db.add(coordination)
+            db.flush()
+
+        # 2. Rapport
+        annee = metadata.get("annee") or datetime.utcnow().year
+        trimestre = metadata.get("trimestre") or 1
+        rapport = Rapport(
+            coordination_id=coordination.id,
+            annee=int(annee) if annee else datetime.utcnow().year,
+            trimestre=int(trimestre) if trimestre else 1,
+            statut="valide",
+            date_soumission=datetime.utcnow(),
+        )
+        db.add(rapport)
+        db.flush()
+
+        # 3. Paroisses
+        for p in data.get("paroisses", []):
+            if p.get("nom"):
+                db.add(Paroisse(rapport_id=rapport.id, **p))
+
+        # 4. Activités (one-to-one)
+        for model_class, section_key in [
+            (ActivitePastorale, "activite_pastorale"),
+            (ActiviteProphetique, "activite_prophetique"),
+            (MedecineHomme, "medecine_homme"),
+            (ActiviteDOS, "activite_dos"),
+            (ActiviteMusique, "activite_musique"),
+            (ActiviteJeunesse, "activite_jeunesse"),
+            (InventaireIntendance, "inventaire_intendance"),
+        ]:
+            section_data = data.get(section_key, {})
+            if section_data:
+                # Filtrer uniquement les colonnes qui existent dans le modèle
+                valid_cols = {
+                    c.name
+                    for c in model_class.__table__.columns
+                    if c.name not in ("id", "rapport_id")
+                }
+                filtered = {k: v for k, v in section_data.items() if k in valid_cols}
+                if filtered:
+                    db.add(model_class(rapport_id=rapport.id, **filtered))
+
+        # 5. Mariages
+        for m in data.get("mariages", []):
+            if m.get("epoux_nom") or m.get("epouse_nom"):
+                db.add(Mariage(rapport_id=rapport.id, **m))
+
+        # 6. Formations
+        for f in data.get("formations", []):
+            if f.get("type"):
+                db.add(Formation(rapport_id=rapport.id, **f))
+
+        # 7. Patrimoine
+        for p in data.get("patrimoine_immobilier", []):
+            if p.get("localisation") or p.get("paroisse"):
+                db.add(PatrimoineImmobilier(rapport_id=rapport.id, **p))
+
+        # 8. Dirigeants musicaux
+        for d in data.get("dirigeants_musicaux", []):
+            if d.get("nom"):
+                db.add(DirigeantMusical(rapport_id=rapport.id, **d))
+
+        # 9. Encadreurs jeunesse
+        for e in data.get("encadreurs_jeunesse", []):
+            if e.get("nom"):
+                db.add(EncadreurJeunesse(rapport_id=rapport.id, **e))
+
+        # 10. Commentaires
+        commentaires = data.get("commentaires", {})
+        for section, texte in commentaires.items():
+            if texte:
+                db.add(
+                    Commentaire(
+                        rapport_id=rapport.id, section=section, texte=str(texte)
+                    )
+                )
+
+        # 11. Conclusion
+        conclusion_text = data.get("conclusion")
+        if conclusion_text:
+            db.add(Conclusion(rapport_id=rapport.id, texte=str(conclusion_text)))
+
+        # 12. Signataires
+        signataires = data.get("signataires", {})
+        for role, nom in signataires.items():
+            if nom:
+                db.add(Signataire(rapport_id=rapport.id, role=role, nom=str(nom)))
+
+        db.commit()
+        return rapport.id
+
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
