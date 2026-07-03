@@ -218,3 +218,42 @@ def delete_uploaded_file(file_id: str) -> bool:
             return True
 
     return False
+
+
+def extract_and_get_reports(file_id: str) -> Optional[FileDetail]:
+    """
+    Déclenche l'extraction IA pour un fichier uploadé et retourne
+    les rapports extraits.
+
+    - PDF/Word : extraction texte → LLM → JSON structuré
+    - Excel/CSV : lecture directe sans LLM
+
+    Args:
+        file_id: Identifiant du fichier.
+
+    Returns:
+        FileDetail enrichi avec les rapports extraits, ou None si introuvable.
+    """
+    detail = get_file_detail(file_id)
+    if detail is None:
+        return None
+
+    # Trouver le chemin physique du fichier
+    upload_dir = _ensure_upload_dir()
+    found_path: Optional[Path] = None
+    for f in upload_dir.iterdir():
+        if f.is_file() and f.stem == file_id:
+            found_path = f
+            break
+
+    if found_path is None:
+        return None
+
+    # Déléguer à l'AI extraction service
+    from app.core.services.ai_extraction_service import extract_reports_from_file
+
+    reports = extract_reports_from_file(found_path, detail.file_type)
+    detail.reports = reports
+    detail.status = "extracted"
+
+    return detail

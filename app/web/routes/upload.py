@@ -133,6 +133,32 @@ async def list_reports() -> list[FileDetail]:
 
 
 # ---------------------------------------------------------------------------
+# POST /api/reports/{file_id}/extract
+# ---------------------------------------------------------------------------
+@router.post(
+    "/reports/{file_id}/extract",
+    response_model=FileDetail,
+    summary="Extraire les données d'un fichier via IA",
+    description=(
+        "Déclenche l'extraction intelligente :\n"
+        "- PDF/Word : OCR + LLM DeepSeek → JSON structuré\n"
+        "- Excel/CSV : lecture directe sans LLM"
+    ),
+)
+async def extract_file_data(file_id: str) -> FileDetail:
+    """
+    Lance l'extraction des données d'un fichier uploadé.
+    """
+    detail = report_service.extract_and_get_reports(file_id)
+    if detail is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Fichier avec l'ID '{file_id}' introuvable.",
+        )
+    return detail
+
+
+# ---------------------------------------------------------------------------
 # DELETE /api/reports/{file_id}
 # ---------------------------------------------------------------------------
 @router.delete(
