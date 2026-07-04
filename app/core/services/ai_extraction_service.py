@@ -70,6 +70,11 @@ def _extract_via_llm(file_path: Path, file_type: str) -> list[ReportInReview]:
             )
         ]
 
+    # Tronquer le texte si trop long (évite de dépasser le contexte LLM)
+    MAX_CHARS = 25000
+    if len(raw_text) > MAX_CHARS:
+        raw_text = raw_text[:MAX_CHARS] + "\n\n[... texte tronqué ...]"
+
     # 2. Appeler le LLM
     try:
         from app.infrastructure.llm.llm_client import create_llm_client_from_settings
@@ -191,10 +196,12 @@ def _extract_structured(file_path: Path, file_type: str) -> list[ReportInReview]
         )
         # Paroisse : chercher dans les sous-champs (pattern ">> 1. >> Paroisse")
         paroisse_nom = _find_smart(
-            row_dict, ["listes des paroisses >> 1. >> paroisse", "paroisses >> 1. >> paroisse"],
+            row_dict,
+            ["listes des paroisses >> 1. >> paroisse", "paroisses >> 1. >> paroisse"],
             allow_subfields=True,
         ) or _find_smart(
-            row_dict, ["paroisse >> 1. >> nom", "liste des paroisses >> 1."],
+            row_dict,
+            ["paroisse >> 1. >> nom", "liste des paroisses >> 1."],
             allow_subfields=True,
         )
 
@@ -213,7 +220,9 @@ def _extract_structured(file_path: Path, file_type: str) -> list[ReportInReview]
     return reports
 
 
-def _find_smart(row_dict: dict, keywords: list[str], allow_subfields: bool = False) -> Optional[str]:
+def _find_smart(
+    row_dict: dict, keywords: list[str], allow_subfields: bool = False
+) -> Optional[str]:
     """
     Recherche par mots-clés dans les colonnes.
     Par défaut ignore les colonnes avec '>>' (sous-champs).
