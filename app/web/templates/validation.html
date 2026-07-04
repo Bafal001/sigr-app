@@ -244,9 +244,11 @@
                 `Fichier : ${info.original_filename} — ${info.rows_detected} rapport(s) détecté(s)`;
             fileStatus.textContent = info.status;
 
-            // 2. Animation de progression (basée sur le temps, pas sur la progression réelle)
+            // 2. Animation de progression avec estimation table courante
             loadingTable.textContent = '🤖 Analyse du document par l\'IA...';
             const startTime = Date.now();
+            const TOTAL_TABLES = 17;
+            const ESTIMATED_SECONDS = 50; // estimation réaliste
             const tables = ['📋 Métadonnées','🏛️ Paroisses','📊 Pastorales','🔮 Prophétiques',
                 '🏥 Médecine','💒 Mariages','📚 Formations','📦 Inventaire','🏠 Immobilier',
                 '👼 DOS','🎵 Musique','🎼 Dirigeants','🧒 Jeunesse','👥 Encadreurs',
@@ -254,13 +256,14 @@
             let animIdx = 0;
             const animInterval = setInterval(() => {
                 const elapsed = Math.round((Date.now() - startTime) / 1000);
-                const pct = Math.min(95, Math.round((elapsed / 45) * 100)); // ~45s estimé
+                const estimatedTable = Math.min(TOTAL_TABLES, Math.ceil((elapsed / ESTIMATED_SECONDS) * TOTAL_TABLES));
+                const pct = Math.min(95, Math.round((elapsed / ESTIMATED_SECONDS) * 100));
                 progressBar.style.width = pct + '%';
-                loadingStats.textContent = `${elapsed}s écoulées`;
+                loadingStats.textContent = `${estimatedTable}/${TOTAL_TABLES} tables · ${elapsed}s`;
                 loadingTable.textContent = tables[animIdx % tables.length];
                 animIdx++;
-                if (elapsed > 60) {
-                    loadingHint.textContent = '⏳ L\'extraction prend plus de temps que prévu...';
+                if (elapsed > 70) {
+                    loadingHint.textContent = '⏳ Plus long que prévu...';
                 }
             }, 1500);
 
@@ -268,13 +271,13 @@
             const extractResp = await fetch(`/api/reports/${fileId}/extract`, { method: 'POST' });
             clearInterval(animInterval);
 
-            // Finaliser la barre
+            // Finaliser
             progressBar.style.width = '100%';
             progressBar.classList.remove('progress-bar-animated');
             progressBar.classList.add('bg-success');
             loadingTable.textContent = '✅ Extraction terminée !';
             const elapsed = Math.round((Date.now() - startTime) / 1000);
-            loadingStats.textContent = `${elapsed}s`;
+            loadingStats.textContent = `17/17 tables · ${elapsed}s`;
 
             if (!extractResp.ok) throw new Error('Erreur lors de l\'extraction');
             const extractData = await extractResp.json();
