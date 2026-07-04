@@ -1,0 +1,6 @@
+Extrais UNIQUEMENT la table {table_id} du rapport en appliquant les règles du méta‑prompt.
+Réponds avec ce JSON exact (pas de markdown, pas de texte autour) :
+{{
+  "{table_id}": <données conformes au schéma>,
+  "points_a_verifier": [{{"champ": "...", "raison": "..."}}]
+}}

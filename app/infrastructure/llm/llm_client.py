@@ -11,18 +11,51 @@ from typing import Optional
 from openai import OpenAI
 
 # ---------------------------------------------------------------------------
-# Chargement du prompt système
+# Chargement des prompts
 # ---------------------------------------------------------------------------
-_PROMPT_PATH = Path(__file__).resolve().parent / "prompts.txt"
-_SYSTEM_PROMPT: Optional[str] = None
+_PROMPT_DIR = Path(__file__).resolve().parent
+_META_PROMPT: Optional[str] = None
+_ITERATION_TEMPLATE: Optional[str] = None
 
 
-def _load_system_prompt() -> str:
-    """Charge le prompt système depuis le fichier prompts.txt (avec cache)."""
-    global _SYSTEM_PROMPT
-    if _SYSTEM_PROMPT is None:
-        _SYSTEM_PROMPT = _PROMPT_PATH.read_text(encoding="utf-8")
-    return _SYSTEM_PROMPT
+def _load_meta_prompt() -> str:
+    """Charge le méta-prompt (envoyé une seule fois)."""
+    global _META_PROMPT
+    if _META_PROMPT is None:
+        _META_PROMPT = (_PROMPT_DIR / "meta_prompt.txt").read_text(encoding="utf-8")
+    return _META_PROMPT
+
+
+def _load_iteration_template() -> str:
+    """Charge le template de prompt d'itération."""
+    global _ITERATION_TEMPLATE
+    if _ITERATION_TEMPLATE is None:
+        _ITERATION_TEMPLATE = (_PROMPT_DIR / "iteration_prompt.txt").read_text(
+            encoding="utf-8"
+        )
+    return _ITERATION_TEMPLATE
+
+
+# Liste des tables dans l'ordre
+TABLE_IDS = [
+    "T01_metadata",
+    "T02_paroisses",
+    "T03_activite_pastorale",
+    "T04_activite_prophetique",
+    "T05_medecine_homme",
+    "T06_mariages",
+    "T07_formations",
+    "T08_inventaire_intendance",
+    "T09_patrimoine_immobilier",
+    "T10_activite_dos",
+    "T11_activite_musique",
+    "T12_dirigeants_musicaux",
+    "T13_activite_jeunesse",
+    "T14_encadreurs_jeunesse",
+    "T15_commentaires",
+    "T16_conclusion",
+    "T17_signataires",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -68,83 +101,73 @@ class LLMClient:
 
     def extract_json_from_text(self, text: str) -> dict:
         """
-        Envoie le texte au LLM et récupère le JSON structuré.
-
-        Args:
-            text: Texte brut extrait du document.
-
-        Returns:
-            Dictionnaire JSON structuré selon le schéma SIGR.
-
-        Raises:
-            ValueError: Si le LLM retourne un JSON invalide.
-            RuntimeError: Si l'API échoue après toutes les tentatives.
+        Extraction ITÉRATIVE : méta-prompt + 17 appels (un par table).
+        Résout le problème de dépassement de tokens.
         """
-        system_prompt = _load_system_prompt()
+        meta = _load_meta_prompt()
+        template = _load_iteration_template()
 
-        last_error: Optional[Exception] = None
+        result: dict = {}
+        failed: list[str] = []
+
+        for i, table_id in enumerate(TABLE_IDS):
+            print(f"  🔄 {table_id} ({i+1}/17)...")
+            try:
+                data = self._extract_single_table(table_id, template, text, meta)
+                if data:
+                    # La réponse est {"Txx_...": {...}, "points_a_verifier": [...]}
+                    for k, v in data.items():
+                        if (
+                            k.startswith("T")
+                            and not k.endswith("_error")
+                            and k != "points_a_verifier"
+                        ):
+                            result[k] = v
+            except Exception as e:
+                failed.append(f"{table_id}: {e}")
+
+        if failed:
+            result["_extraction_errors"] = failed
+
+        return result
+
+    def _extract_single_table(
+        self, table_id: str, template: str, full_text: str, meta_prompt: str
+    ) -> Optional[dict]:
+        """Extrait UNE SEULE table avec retry."""
+        prompt = template.format(table_id=table_id)
+        # Limiter le texte pour cette itération
+        text_snippet = full_text[:25000]
 
         for attempt in range(1, self.max_retries + 1):
             try:
                 response = self._client.chat.completions.create(
                     model=self.model,
                     messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": text},
+                        {"role": "system", "content": meta_prompt},
+                        {
+                            "role": "user",
+                            "content": f"{text_snippet}\n\n---\n\n{prompt}",
+                        },
                     ],
-                    max_tokens=self.max_tokens,
+                    max_tokens=min(self.max_tokens, 2048),
                     temperature=self.temperature,
                 )
-
-                raw_output = response.choices[0].message.content
-                if raw_output is None:
-                    raise ValueError("Le LLM a retourné une réponse vide.")
-
-                # Nettoyer et parser le JSON
-                return _parse_llm_json(raw_output)
-
-            except json.JSONDecodeError as e:
-                last_error = e
+                raw = response.choices[0].message.content
+                if raw is None:
+                    raise ValueError("Réponse vide")
+                return _parse_llm_json(raw)
+            except json.JSONDecodeError:
                 if attempt < self.max_retries:
-                    wait = 2**attempt  # Backoff exponentiel : 2, 4, 8 secondes
-                    time.sleep(wait)
-                    continue
-                raise ValueError(
-                    f"Le LLM n'a pas retourné un JSON valide "
-                    f"après {self.max_retries} tentatives : {e}"
-                ) from e
-
+                    time.sleep(2**attempt)
             except Exception as e:
-                last_error = e
-                error_str = str(e).lower()
-
-                # Erreurs récupérables (rate limit, timeout, serveur)
-                if any(
-                    kw in error_str
-                    for kw in (
-                        "429",
-                        "rate limit",
-                        "timeout",
-                        "503",
-                        "502",
-                        "server error",
-                    )
-                ):
+                err = str(e).lower()
+                if any(kw in err for kw in ("429", "rate", "timeout", "503", "502")):
                     if attempt < self.max_retries:
-                        wait = 2**attempt
-                        time.sleep(wait)
+                        time.sleep(2**attempt)
                         continue
-
-                # Erreur non récupérable
-                raise RuntimeError(
-                    f"Erreur API LLM (tentative {attempt}/{self.max_retries}) : {e}"
-                ) from e
-
-        # Ne devrait jamais arriver, mais sécurité
-        raise RuntimeError(
-            f"Échec après {self.max_retries} tentatives. "
-            f"Dernière erreur : {last_error}"
-        )
+                raise
+        return None
 
 
 def _parse_llm_json(raw: str) -> dict:

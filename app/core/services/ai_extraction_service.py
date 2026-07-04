@@ -57,11 +57,10 @@ def _extract_via_llm(file_path: Path, file_type: str) -> list[ReportInReview]:
     Returns:
         Liste avec un seul ReportInReview contenant les données extraites.
     """
-    # 1. Extraire le texte brut
+    # 1. Extraire le texte brut (PAS de troncation, l'itératif gère)
     raw_text = _extract_raw_text(file_path, file_type)
 
     if not raw_text or not raw_text.strip():
-        # Fichier vide ou illisible
         return [
             ReportInReview(
                 row_index=0,
@@ -70,40 +69,71 @@ def _extract_via_llm(file_path: Path, file_type: str) -> list[ReportInReview]:
             )
         ]
 
-    # Tronquer le texte si trop long (évite de dépasser le contexte LLM)
-    MAX_CHARS = 30000
-    if len(raw_text) > MAX_CHARS:
-        raw_text = raw_text[:MAX_CHARS] + "\n\n[... texte tronqué ...]"
-
-    # 2. Appeler le LLM
+    # 2. Appeler le LLM en mode ITÉRATIF (17 appels, un par table)
     try:
         from app.infrastructure.llm.llm_client import create_llm_client_from_settings
 
         client = create_llm_client_from_settings()
-        json_data = client.extract_json_from_text(raw_text)
-    except ValueError as e:
-        # Erreur de parsing JSON
-        return [
-            ReportInReview(
-                row_index=0,
-                validation_status="erreur_llm",
-                raw_data={"error": str(e), "raw_text_preview": raw_text[:500]},
-            )
-        ]
+        llm_result = client.extract_json_from_text(raw_text)
     except Exception as e:
         return [
             ReportInReview(
                 row_index=0,
                 validation_status="erreur_api",
-                raw_data={
-                    "error": f"Erreur API LLM : {str(e)}",
-                    "raw_text_preview": raw_text[:500],
-                },
+                raw_data={"error": f"Erreur API LLM : {str(e)}"},
             )
         ]
 
-    # 3. Construire le ReportInReview
-    metadata = json_data.get("metadata", {})
+    # 3. Remapper Txx_... → noms de sections standard
+    TABLE_MAP = {
+        "T01_metadata": "metadata",
+        "T02_paroisses": "paroisses",
+        "T03_activite_pastorale": "activite_pastorale",
+        "T04_activite_prophetique": "activite_prophetique",
+        "T05_medecine_homme": "medecine_homme",
+        "T06_mariages": "mariages",
+        "T07_formations": "formations",
+        "T08_inventaire_intendance": "inventaire_intendance",
+        "T09_patrimoine_immobilier": "patrimoine_immobilier",
+        "T10_activite_dos": "activite_dos",
+        "T11_activite_musique": "activite_musique",
+        "T12_dirigeants_musicaux": "dirigeants_musicaux",
+        "T13_activite_jeunesse": "activite_jeunesse",
+        "T14_encadreurs_jeunesse": "encadreurs_jeunesse",
+        "T15_commentaires": "commentaires",
+        "T16_conclusion": "conclusion",
+        "T17_signataires": "signataires",
+    }
+
+    json_data: dict = {}
+    for t_key, std_key in TABLE_MAP.items():
+        if t_key in llm_result:
+            json_data[std_key] = llm_result[t_key]
+        else:
+            json_data[std_key] = (
+                None
+                if std_key == "conclusion"
+                else (
+                    []
+                    if std_key
+                    in (
+                        "paroisses",
+                        "mariages",
+                        "formations",
+                        "patrimoine_immobilier",
+                        "dirigeants_musicaux",
+                        "encadreurs_jeunesse",
+                    )
+                    else {}
+                )
+            )
+
+    # Ajouter les erreurs s'il y en a
+    if "_extraction_errors" in llm_result:
+        json_data["_extraction_errors"] = llm_result["_extraction_errors"]
+
+    # 4. Construire le ReportInReview
+    metadata = json_data.get("metadata") or {}
     report = ReportInReview(
         row_index=0,
         coordination_nom=metadata.get("coordination_nom"),
