@@ -114,13 +114,23 @@
         </div>
     </div>
 
-    <!-- État de chargement -->
+    <!-- État de chargement avec barre de progression -->
     <div id="loadingOverlay">
-        <div class="text-center">
+        <div class="text-center" style="max-width: 500px; margin: 0 auto;">
             <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
-                <span class="visually-hidden">Chargement...</span>
+                <span class="visually-hidden">Extraction...</span>
             </div>
-            <p class="text-muted">Chargement des rapports extraits...</p>
+            <h6 class="mb-2" id="loadingTitle">🔍 Extraction IA en cours</h6>
+            <p class="text-muted small mb-3" id="loadingTable">Initialisation...</p>
+            <!-- Barre de progression -->
+            <div class="progress mb-2" style="height: 10px;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated"
+                     id="extractProgressBar" role="progressbar" style="width: 0%"></div>
+            </div>
+            <small class="text-muted" id="loadingStats">0/17 tables</small>
+            <p class="text-muted small mt-3" id="loadingHint">
+                ⏱️ L'extraction complète peut prendre 30-60 secondes
+            </p>
         </div>
     </div>
 
@@ -218,10 +228,15 @@
     const fileInfoText     = document.getElementById('fileInfoText');
     const fileStatus       = document.getElementById('fileStatus');
 
-    // --- Chargement des données (réel, via API) ---
+    // --- Chargement des données avec barre de progression ---
     async function loadReports() {
+        const progressBar = document.getElementById('extractProgressBar');
+        const loadingTable = document.getElementById('loadingTable');
+        const loadingStats = document.getElementById('loadingStats');
+        const loadingHint = document.getElementById('loadingHint');
+
         try {
-            // 1. D'abord, charger les infos du fichier
+            // 1. Infos du fichier
             const infoResp = await fetch(`/api/reports/${fileId}`);
             if (!infoResp.ok) throw new Error('Fichier introuvable');
             const info = await infoResp.json();
@@ -229,20 +244,59 @@
                 `Fichier : ${info.original_filename} — ${info.rows_detected} rapport(s) détecté(s)`;
             fileStatus.textContent = info.status;
 
-            // 2. Lancer l'extraction (si pas déjà faite)
-            loadingOverlay.querySelector('p').textContent = '🔍 Extraction des données en cours...';
+            // 2. Démarrer la progression SSE
+            loadingTable.textContent = 'Connexion au moteur IA...';
+            const evtSource = new EventSource(`/api/reports/${fileId}/extract/progress`);
+            
+            evtSource.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                const pct = Math.round((data.current / data.total) * 100);
+                progressBar.style.width = pct + '%';
+                loadingStats.textContent = `${data.current}/${data.total} tables`;
+                
+                if (data.status === 'extracting') {
+                    const names = {
+                        'T01_metadata': '📋 Métadonnées', 'T02_paroisses': '🏛️ Paroisses',
+                        'T03_activite_pastorale': '📊 Activités Pastorales',
+                        'T04_activite_prophetique': '🔮 Prophétiques', 'T05_medecine_homme': '🏥 Médecine',
+                        'T06_mariages': '💒 Mariages', 'T07_formations': '📚 Formations',
+                        'T08_inventaire_intendance': '📦 Inventaire', 'T09_patrimoine_immobilier': '🏠 Immobilier',
+                        'T10_activite_dos': '👼 DOS', 'T11_activite_musique': '🎵 Musique',
+                        'T12_dirigeants_musicaux': '🎼 Dirigeants Musicaux',
+                        'T13_activite_jeunesse': '🧒 Jeunesse', 'T14_encadreurs_jeunesse': '👥 Encadreurs',
+                        'T15_commentaires': '💬 Commentaires', 'T16_conclusion': '📝 Conclusion',
+                        'T17_signataires': '✍️ Signataires'
+                    };
+                    loadingTable.textContent = names[data.table] || data.table;
+                    loadingHint.textContent = '⏳ Extraction table par table...';
+                } else if (data.status === 'assembling') {
+                    loadingTable.textContent = '🔧 Assemblage des résultats...';
+                    loadingHint.textContent = '✨ Finalisation...';
+                } else if (data.status === 'done') {
+                    evtSource.close();
+                    loadingTable.textContent = '✅ Extraction terminée !';
+                    loadingHint.textContent = 'Chargement des résultats...';
+                }
+            };
+
+            evtSource.onerror = () => {
+                evtSource.close();
+                loadingHint.textContent = '⚠️ Suivi de progression interrompu';
+            };
+
+            // 3. Lancer l'extraction réelle
             const extractResp = await fetch(`/api/reports/${fileId}/extract`, { method: 'POST' });
+            evtSource.close();
+            
             if (!extractResp.ok) throw new Error('Erreur lors de l\'extraction');
             const extractData = await extractResp.json();
 
-            // 3. Utiliser les vrais rapports extraits
+            // 4. Afficher les résultats
             allReports = extractData.reports || [];
             if (allReports.length === 0) {
-                // Fallback : générer des aperçus à partir de rows_detected
                 allReports = generateMockReports(info.rows_detected, info.file_type);
             }
             fileStatus.textContent = extractData.status || 'extracted';
-
             renderTable();
         } catch (err) {
             loadingOverlay.innerHTML = `

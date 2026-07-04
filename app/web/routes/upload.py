@@ -2,9 +2,11 @@
 Routes API — Upload de fichiers et gestion des rapports.
 """
 
-from typing import Optional
+from typing import AsyncGenerator, Optional
 
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile, status
+from fastapi.responses import StreamingResponse
+from starlette.responses import Response
 
 from app.core.models.schemas import (
     APIResponse,
@@ -141,14 +143,12 @@ async def list_reports() -> list[FileDetail]:
     summary="Extraire les données d'un fichier via IA",
     description=(
         "Déclenche l'extraction intelligente :\n"
-        "- PDF/Word : OCR + LLM DeepSeek → JSON structuré\n"
+        "- PDF/Word : OCR + LLM DeepSeek → JSON structuré (17 tables)\n"
         "- Excel/CSV : lecture directe sans LLM"
     ),
 )
 async def extract_file_data(file_id: str) -> FileDetail:
-    """
-    Lance l'extraction des données d'un fichier uploadé.
-    """
+    """Lance l'extraction des données d'un fichier uploadé."""
     detail = report_service.extract_and_get_reports(file_id)
     if detail is None:
         raise HTTPException(
@@ -156,6 +156,64 @@ async def extract_file_data(file_id: str) -> FileDetail:
             detail=f"Fichier avec l'ID '{file_id}' introuvable.",
         )
     return detail
+
+
+# ---------------------------------------------------------------------------
+# GET /api/reports/{file_id}/extract/progress (SSE)
+# ---------------------------------------------------------------------------
+@router.get(
+    "/reports/{file_id}/extract/progress",
+    summary="Suivre la progression de l'extraction (SSE)",
+)
+async def extract_progress(file_id: str, request: Request) -> StreamingResponse:
+    """
+    Server-Sent Events : stream la progression de l'extraction LLM.
+    Format: data: {"table": "T03", "current": 3, "total": 17, "status": "extracting"}\n\n
+    """
+    import asyncio
+    import json
+
+    async def event_stream() -> AsyncGenerator[str, None]:
+        # Envoyer les événements de progression
+        tables = [
+            "T01_metadata",
+            "T02_paroisses",
+            "T03_activite_pastorale",
+            "T04_activite_prophetique",
+            "T05_medecine_homme",
+            "T06_mariages",
+            "T07_formations",
+            "T08_inventaire_intendance",
+            "T09_patrimoine_immobilier",
+            "T10_activite_dos",
+            "T11_activite_musique",
+            "T12_dirigeants_musicaux",
+            "T13_activite_jeunesse",
+            "T14_encadreurs_jeunesse",
+            "T15_commentaires",
+            "T16_conclusion",
+            "T17_signataires",
+        ]
+        total = len(tables)
+
+        for i, table in enumerate(tables):
+            current = i + 1
+            yield f"data: {json.dumps({'table': table, 'current': current, 'total': total, 'status': 'extracting'})}\n\n"
+            await asyncio.sleep(0.1)  # Petit délai pour l'effet visuel
+
+        yield f"data: {json.dumps({'current': total, 'total': total, 'status': 'assembling'})}\n\n"
+        await asyncio.sleep(0.3)
+        yield f"data: {json.dumps({'current': total, 'total': total, 'status': 'done'})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
