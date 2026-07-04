@@ -4,10 +4,11 @@ Respecte Clean Architecture : logique métier pure, sans dépendances web.
 """
 
 import os
+import re
 import shutil
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 from uuid import uuid4
 
 from app.core.models.schemas import FileDetail, ReportInReview, UploadResponse
@@ -384,11 +385,21 @@ def _insert_rapport(data: dict) -> int:
         # 5. Mariages
         for m in data.get("mariages", []):
             if m.get("epoux_nom") or m.get("epouse_nom"):
+                m["date"] = _parse_date_safe(m.get("date"))
                 db.add(Mariage(rapport_id=rapport.id, **m))
 
         # 6. Formations
         for f in data.get("formations", []):
             if f.get("type"):
+                f["date"] = _parse_date_safe(f.get("date"))
+                # Ignorer les formations avec date invalide qui ne contiennent aucune info utile
+                if (
+                    f.get("date") is None
+                    and not f.get("theme")
+                    and not f.get("formateur")
+                ):
+                    if not f.get("observation"):
+                        continue  # Sauter les lignes vides
                 db.add(Formation(rapport_id=rapport.id, **f))
 
         # 7. Patrimoine
@@ -435,3 +446,154 @@ def _insert_rapport(data: dict) -> int:
         raise
     finally:
         db.close()
+
+
+def _parse_date_safe(value: Any) -> Optional[date]:
+    """
+    Parse une valeur en date Python de manière robuste.
+    Accepte de nombreux formats : '17 janvier', '06/02/2026', '10 JAN 2026',
+    'vendredi 09 janvier 2026', 'CHAQUE SAMEDI', etc.
+    Retourne None si la valeur est invalide ou non parseable.
+    """
+    if value is None:
+        return None
+
+    # Si c'est déjà une date
+    if isinstance(value, (date, datetime)):
+        return value if isinstance(value, date) else value.date()
+
+    # Convertir en chaîne
+    s = str(value).strip()
+
+    # Valeurs manifestement invalides
+    if s.lower() in ("", "nul", "null", "none", "n/a", "na", "-", "—", "o", "0"):
+        return None
+
+    # Nettoyer les préfixes comme "Le ", "Samedi le ", "Vendredi ", "Mercredi ", etc.
+    cleaned = re.sub(
+        r"^(le|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\s+(le\s+)?",
+        "",
+        s,
+        flags=re.IGNORECASE,
+    ).strip()
+
+    # Formats à essayer (du plus spécifique au plus générique)
+    formats = [
+        # Dates ISO et slash
+        "%Y-%m-%d",
+        "%d/%m/%Y",
+        "%d.%m.%Y",
+        "%m/%d/%Y",
+        # Avec mois texte FR
+        "%d %B %Y",
+        "%d %b %Y",
+        "%d %B%Y",
+        "%B %Y",
+        # Mois texte EN
+        "%d %B %Y",
+        "%d %b %Y",
+        "%d %B%Y",
+        # Formats abrégés
+        "%d/%m/%y",
+        "%d.%m.%y",
+    ]
+
+    for fmt in formats:
+        try:
+            return datetime.strptime(cleaned, fmt).date()
+        except (ValueError, OverflowError):
+            continue
+
+    # Essayer avec python-dateutil si disponible
+    try:
+        from dateutil.parser import parse as dateutil_parse
+
+        dt = dateutil_parse(cleaned, fuzzy=True, dayfirst=True)
+        if dt:
+            return dt.date()
+    except ImportError:
+        pass
+    except (ValueError, OverflowError):
+        pass
+
+    # Dernière tentative : chercher un pattern date dans la chaîne
+    date_patterns = [
+        r"(\d{1,2})[/.](\d{1,2})[/.](\d{2,4})",  # 06/02/2026
+        r"(\d{1,2})\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s+(\d{4})",
+        r"(\d{1,2})\s+(jan|fév|mar|avr|mai|juin|juil|août|sep|oct|nov|déc)\s+(\d{4})",
+        r"(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+(\d{4})",
+    ]
+
+    for pattern in date_patterns:
+        match = re.search(pattern, cleaned, re.IGNORECASE)
+        if match:
+            groups = match.groups()
+            try:
+                day = int(groups[0])
+                month_str = groups[1]
+                year = int(groups[2])
+                if year < 100:
+                    year += 2000
+                # Essayer de parser le mois
+                month = _parse_month(month_str)
+                if month and 1 <= day <= 31 and 2000 <= year <= 2100:
+                    return date(year, month, min(day, 28))  # Sécurité jour
+            except (ValueError, IndexError):
+                continue
+
+    # Si rien n'a fonctionné, retourner None (la date sera absente en base)
+    return None
+
+
+def _parse_month(month_str: str) -> Optional[int]:
+    """Parse un nom de mois (FR/EN) en numéro (1-12)."""
+    months = {
+        # Français
+        "janvier": 1,
+        "février": 2,
+        "fevrier": 2,
+        "mars": 3,
+        "avril": 4,
+        "mai": 5,
+        "juin": 6,
+        "juillet": 7,
+        "août": 8,
+        "aout": 8,
+        "septembre": 9,
+        "octobre": 10,
+        "novembre": 11,
+        "décembre": 12,
+        "decembre": 12,
+        # Abrégés FR
+        "jan": 1,
+        "fév": 2,
+        "fev": 2,
+        "mar": 3,
+        "avr": 4,
+        "juil": 7,
+        "sep": 9,
+        "oct": 10,
+        "nov": 11,
+        "déc": 12,
+        "dec": 12,
+        # Anglais
+        "january": 1,
+        "february": 2,
+        "march": 3,
+        "april": 4,
+        "may": 5,
+        "june": 6,
+        "july": 7,
+        "august": 8,
+        "september": 9,
+        "october": 10,
+        "november": 11,
+        "december": 12,
+        # Abrégés EN
+        "feb": 2,
+        "apr": 4,
+        "jun": 6,
+        "jul": 7,
+        "aug": 8,
+    }
+    return months.get(month_str.lower().strip())
