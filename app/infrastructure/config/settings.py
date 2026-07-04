@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     deepseek_api_key: str = ""
     llm_api_base_url: str = "https://api.deepseek.com"
-    llm_model: str = "deepseek-v4-pro"
+    llm_model: str = "deepseek-chat"
     llm_max_tokens: int = 4096
     llm_temperature: float = 0.1  # Basse température pour extraction fidèle
 

@@ -71,7 +71,7 @@ def _extract_via_llm(file_path: Path, file_type: str) -> list[ReportInReview]:
         ]
 
     # Tronquer le texte si trop long (évite de dépasser le contexte LLM)
-    MAX_CHARS = 25000
+    MAX_CHARS = 30000
     if len(raw_text) > MAX_CHARS:
         raw_text = raw_text[:MAX_CHARS] + "\n\n[... texte tronqué ...]"
 
