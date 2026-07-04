@@ -228,7 +228,7 @@
     const fileInfoText     = document.getElementById('fileInfoText');
     const fileStatus       = document.getElementById('fileStatus');
 
-    // --- Chargement des données avec barre de progression ---
+    // --- Chargement des données avec indicateur de temps réel ---
     async function loadReports() {
         const progressBar = document.getElementById('extractProgressBar');
         const loadingTable = document.getElementById('loadingTable');
@@ -244,54 +244,41 @@
                 `Fichier : ${info.original_filename} — ${info.rows_detected} rapport(s) détecté(s)`;
             fileStatus.textContent = info.status;
 
-            // 2. Démarrer la progression SSE
-            loadingTable.textContent = 'Connexion au moteur IA...';
-            const evtSource = new EventSource(`/api/reports/${fileId}/extract/progress`);
-            
-            evtSource.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                const pct = Math.round((data.current / data.total) * 100);
+            // 2. Animation de progression (basée sur le temps, pas sur la progression réelle)
+            loadingTable.textContent = '🤖 Analyse du document par l\'IA...';
+            const startTime = Date.now();
+            const tables = ['📋 Métadonnées','🏛️ Paroisses','📊 Pastorales','🔮 Prophétiques',
+                '🏥 Médecine','💒 Mariages','📚 Formations','📦 Inventaire','🏠 Immobilier',
+                '👼 DOS','🎵 Musique','🎼 Dirigeants','🧒 Jeunesse','👥 Encadreurs',
+                '💬 Commentaires','📝 Conclusion','✍️ Signataires'];
+            let animIdx = 0;
+            const animInterval = setInterval(() => {
+                const elapsed = Math.round((Date.now() - startTime) / 1000);
+                const pct = Math.min(95, Math.round((elapsed / 45) * 100)); // ~45s estimé
                 progressBar.style.width = pct + '%';
-                loadingStats.textContent = `${data.current}/${data.total} tables`;
-                
-                if (data.status === 'extracting') {
-                    const names = {
-                        'T01_metadata': '📋 Métadonnées', 'T02_paroisses': '🏛️ Paroisses',
-                        'T03_activite_pastorale': '📊 Activités Pastorales',
-                        'T04_activite_prophetique': '🔮 Prophétiques', 'T05_medecine_homme': '🏥 Médecine',
-                        'T06_mariages': '💒 Mariages', 'T07_formations': '📚 Formations',
-                        'T08_inventaire_intendance': '📦 Inventaire', 'T09_patrimoine_immobilier': '🏠 Immobilier',
-                        'T10_activite_dos': '👼 DOS', 'T11_activite_musique': '🎵 Musique',
-                        'T12_dirigeants_musicaux': '🎼 Dirigeants Musicaux',
-                        'T13_activite_jeunesse': '🧒 Jeunesse', 'T14_encadreurs_jeunesse': '👥 Encadreurs',
-                        'T15_commentaires': '💬 Commentaires', 'T16_conclusion': '📝 Conclusion',
-                        'T17_signataires': '✍️ Signataires'
-                    };
-                    loadingTable.textContent = names[data.table] || data.table;
-                    loadingHint.textContent = '⏳ Extraction table par table...';
-                } else if (data.status === 'assembling') {
-                    loadingTable.textContent = '🔧 Assemblage des résultats...';
-                    loadingHint.textContent = '✨ Finalisation...';
-                } else if (data.status === 'done') {
-                    evtSource.close();
-                    loadingTable.textContent = '✅ Extraction terminée !';
-                    loadingHint.textContent = 'Chargement des résultats...';
+                loadingStats.textContent = `${elapsed}s écoulées`;
+                loadingTable.textContent = tables[animIdx % tables.length];
+                animIdx++;
+                if (elapsed > 60) {
+                    loadingHint.textContent = '⏳ L\'extraction prend plus de temps que prévu...';
                 }
-            };
-
-            evtSource.onerror = () => {
-                evtSource.close();
-                loadingHint.textContent = '⚠️ Suivi de progression interrompu';
-            };
+            }, 1500);
 
             // 3. Lancer l'extraction réelle
             const extractResp = await fetch(`/api/reports/${fileId}/extract`, { method: 'POST' });
-            evtSource.close();
-            
+            clearInterval(animInterval);
+
+            // Finaliser la barre
+            progressBar.style.width = '100%';
+            progressBar.classList.remove('progress-bar-animated');
+            progressBar.classList.add('bg-success');
+            loadingTable.textContent = '✅ Extraction terminée !';
+            const elapsed = Math.round((Date.now() - startTime) / 1000);
+            loadingStats.textContent = `${elapsed}s`;
+
             if (!extractResp.ok) throw new Error('Erreur lors de l\'extraction');
             const extractData = await extractResp.json();
 
-            // 4. Afficher les résultats
             allReports = extractData.reports || [];
             if (allReports.length === 0) {
                 allReports = generateMockReports(info.rows_detected, info.file_type);
