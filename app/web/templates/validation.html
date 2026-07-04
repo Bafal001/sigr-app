@@ -129,7 +129,7 @@
             </div>
             <small class="text-muted" id="loadingStats">0/17 tables</small>
             <p class="text-muted small mt-3" id="loadingHint">
-                ⏱️ L'extraction complète peut prendre 30-60 secondes
+                ⏱️ Extraction de 17 tables — environ 60-90 secondes
             </p>
         </div>
     </div>
@@ -248,7 +248,7 @@
             loadingTable.textContent = '🤖 Analyse du document par l\'IA...';
             const startTime = Date.now();
             const TOTAL_TABLES = 17;
-            const ESTIMATED_SECONDS = 50; // estimation réaliste
+            const ESTIMATED_SECONDS = 70; // calibré sur benchmark réel (~4s/table)
             const tables = ['📋 Métadonnées','🏛️ Paroisses','📊 Pastorales','🔮 Prophétiques',
                 '🏥 Médecine','💒 Mariages','📚 Formations','📦 Inventaire','🏠 Immobilier',
                 '👼 DOS','🎵 Musique','🎼 Dirigeants','🧒 Jeunesse','👥 Encadreurs',
@@ -262,7 +262,7 @@
                 loadingStats.textContent = `${estimatedTable}/${TOTAL_TABLES} tables · ${elapsed}s`;
                 loadingTable.textContent = tables[animIdx % tables.length];
                 animIdx++;
-                if (elapsed > 70) {
+                if (elapsed > 90) {
                     loadingHint.textContent = '⏳ Plus long que prévu...';
                 }
             }, 1500);
